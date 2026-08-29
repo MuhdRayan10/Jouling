@@ -35,6 +35,7 @@ let activeAttempt = null;
 let proofDataUrl = null;
 let scannerStream = null;
 let scannerTimer = null;
+let qrDecoder = null;
 let toastTimer = null;
 let resultRetryAllowed = false;
 let matchCountdownTimer = null;
@@ -53,9 +54,17 @@ async function api(path, options = {}) {
     ...options,
     headers: { "Content-Type": "application/json", ...(options.headers || {}) }
   });
-  const payload = await response.json().catch(() => ({}));
+  const text = await response.text();
+  let payload = {};
+  try {
+    payload = text ? JSON.parse(text) : {};
+  } catch {
+    // Platform-level failures (gateway errors, body limits) reply with HTML.
+    payload = {};
+  }
   if (!response.ok) {
-    const error = new Error(payload.error?.message || `Request failed (${response.status})`);
+    const detail = payload.error?.message || text.slice(0, 120).trim();
+    const error = new Error(detail || `Request failed (${response.status} ${response.statusText})`);
     error.status = response.status;
     throw error;
   }
@@ -612,27 +621,57 @@ async function validateQr(missionId, token) {
   }
 }
 
+// Safari (including iOS home-screen web apps) ships no BarcodeDetector, so fall
+// back to decoding frames with jsQR on a canvas.
+async function loadQrDecoder() {
+  if (qrDecoder) return qrDecoder;
+  if ("BarcodeDetector" in window) {
+    try {
+      const formats = await window.BarcodeDetector.getSupportedFormats?.() ?? ["qr_code"];
+      if (formats.includes("qr_code")) {
+        const detector = new window.BarcodeDetector({ formats: ["qr_code"] });
+        qrDecoder = async (video) => (await detector.detect(video))[0]?.rawValue || null;
+        return qrDecoder;
+      }
+    } catch (error) {
+      console.debug("BarcodeDetector unavailable, using the jsQR fallback", error);
+    }
+  }
+  const { default: jsQR } = await import("/vendor/jsqr/jsqr.mjs");
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  qrDecoder = (video) => {
+    if (!video.videoWidth || !video.videoHeight) return null;
+    const scale = Math.min(1, 640 / Math.max(video.videoWidth, video.videoHeight));
+    canvas.width = Math.round(video.videoWidth * scale);
+    canvas.height = Math.round(video.videoHeight * scale);
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const frame = context.getImageData(0, 0, canvas.width, canvas.height);
+    return jsQR(frame.data, canvas.width, canvas.height, { inversionAttempts: "dontInvert" })?.data || null;
+  };
+  return qrDecoder;
+}
+
 async function startScanner() {
   if (!("mediaDevices" in navigator) || !navigator.mediaDevices.getUserMedia) {
     return showToast("Camera scanning needs HTTPS or localhost. Open Jouling on your phone at the mission spot.", "!");
-  }
-  if (!("BarcodeDetector" in window)) {
-    return showToast("This browser lacks QR detection. Use your phone camera to open the Jouling label.", "!");
   }
   try {
     scannerStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
     const video = $("#scannerVideo");
     video.srcObject = scannerStream;
+    video.setAttribute("playsinline", "");
+    video.muted = true;
     await video.play();
     $("#scannerWindow").classList.add("streaming");
     $("#startScannerButton").textContent = "Scanning…";
-    const detector = new BarcodeDetector({ formats: ["qr_code"] });
+    const decode = await loadQrDecoder();
     const scanFrame = async () => {
       if (!scannerStream) return;
       try {
-        const codes = await detector.detect(video);
-        if (codes[0]?.rawValue) {
-          const parsed = parseQrPayload(codes[0].rawValue);
+        const rawValue = await decode(video);
+        if (rawValue) {
+          const parsed = parseQrPayload(rawValue);
           await validateQr(parsed.missionId, parsed.token);
           return;
         }
@@ -643,6 +682,7 @@ async function startScanner() {
     };
     scanFrame();
   } catch (error) {
+    stopScanner();
     showToast(error.name === "NotAllowedError" ? "Camera permission was not granted" : "Unable to start the camera", "!");
   }
 }

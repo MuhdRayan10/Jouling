@@ -34,7 +34,23 @@ function sendJson(res, statusCode, payload) {
   res.end(body);
 }
 
+function parseJsonText(text) {
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw Object.assign(new Error("Request body must be valid JSON"), { statusCode: 400 });
+  }
+}
+
 async function readJson(req) {
+  // Serverless platforms (Vercel) consume the request stream and hand the body
+  // over on req.body, so the stream below would otherwise yield nothing.
+  if (req.body !== undefined && req.body !== null) {
+    if (Buffer.isBuffer(req.body)) return parseJsonText(req.body.toString("utf8"));
+    if (typeof req.body === "string") return parseJsonText(req.body);
+    if (typeof req.body === "object") return req.body;
+  }
   let bytes = 0;
   const chunks = [];
   for await (const chunk of req) {
@@ -43,11 +59,7 @@ async function readJson(req) {
     chunks.push(chunk);
   }
   if (!chunks.length) return {};
-  try {
-    return JSON.parse(Buffer.concat(chunks).toString("utf8"));
-  } catch {
-    throw Object.assign(new Error("Request body must be valid JSON"), { statusCode: 400 });
-  }
+  return parseJsonText(Buffer.concat(chunks).toString("utf8"));
 }
 
 async function serveStatic(req, res, url) {
