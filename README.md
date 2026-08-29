@@ -21,6 +21,30 @@ To run the automated tests:
 npm test
 ```
 
+## Deploy to Vercel
+
+Import this repository in Vercel and use the **Other** framework preset. The
+`public/` directory is deployed as the static PWA, while `api/[...path].mjs`
+exposes the existing backend routes as a Vercel Function. No build command or
+output-directory override is required.
+
+Add these variables in **Project Settings → Environment Variables** for
+Production, Preview, and Development:
+
+```text
+OPENAI_API_KEY=<your rotated key>
+OPENAI_VISION_MODEL=gpt-5.4-mini
+JOULING_DEMO_VERIFIER=false
+```
+
+Do not add `PORT`: Vercel manages the function runtime. After redeploying, open
+`/api/health`; a working live-verification deployment reports `ok: true` and
+`verifierMode: "openai"`.
+
+The current store is intentionally in memory. It is suitable for a short demo,
+but Vercel can replace function instances at any time, so production game state
+requires a database.
+
 ## Photo verification modes
 
 The complete OpenAI Responses API integration is implemented server-side. The server automatically loads a local `.env` file:
