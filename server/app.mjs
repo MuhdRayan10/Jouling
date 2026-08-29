@@ -76,8 +76,8 @@ async function serveStatic(req, res, url) {
   }
 }
 
-export function createJoulingServer({ store = new JoulingStore(), verifier = new PhotoVerifier() } = {}) {
-  return createHttpServer(async (req, res) => {
+export function createJoulingRequestHandler({ store = new JoulingStore(), verifier = new PhotoVerifier() } = {}) {
+  return async (req, res) => {
     const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
     try {
       if (req.method === "GET" && url.pathname === "/api/health") {
@@ -145,5 +145,9 @@ export function createJoulingServer({ store = new JoulingStore(), verifier = new
         }
       });
     }
-  });
+  };
+}
+
+export function createJoulingServer(options = {}) {
+  return createHttpServer(createJoulingRequestHandler(options));
 }
