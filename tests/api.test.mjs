@@ -39,6 +39,7 @@ test("bootstrap returns the map, current team, and competition state", async () 
     assert.equal(payload.team.id, "team-green");
     assert.equal(payload.missions.length, 6);
     assert.equal(payload.territories.length, 2);
+    assert.equal(payload.territories[0].areaSqFt, 18500);
     assert.equal(payload.territories[0].progress.completed, 2);
     assert.equal(payload.missions[0].qrToken, undefined, "QR secrets must not be exposed in bootstrap state");
   });
@@ -101,6 +102,7 @@ test("verified proof awards impact and captures a three-node territory", async (
     assert.equal(verified.payload.impact.kwhSaved, 0.855);
     assert.equal(verified.payload.captures[0].territoryId, "territory-central");
     assert.equal(verified.payload.state.territories[0].ownerTeamId, "team-green");
+    assert.equal(verified.payload.state.territories[0].areaSqFt, 18500);
     assert.equal(verified.payload.state.user.xp, 980);
     assert.equal(verified.payload.state.team.score, 3210, "mission XP plus capture bonus should be awarded");
   });

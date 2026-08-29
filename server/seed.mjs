@@ -239,6 +239,7 @@ export function createSeedState() {
       {
         id: "territory-central",
         name: "Central Commons",
+        areaSqFt: 18500,
         nodeIds: ["mission-com3-projector", "mission-study-lights", "mission-library-ac"],
         polygon: [[28, 57], [49, 35], [68, 59]],
         ownerTeamId: "team-gold",
@@ -258,6 +259,7 @@ export function createSeedState() {
       {
         id: "territory-utown",
         name: "UTown Triangle",
+        areaSqFt: 22400,
         nodeIds: ["mission-utown-screen", "mission-hall-sockets", "mission-innovation-door"],
         polygon: [[80, 26], [72, 16], [91, 43]],
         ownerTeamId: "team-gold",

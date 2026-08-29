@@ -57,7 +57,7 @@ The canonical QR payload is a web link carrying `protocol=jouling.mission`, `v=1
 http://localhost:4173/?protocol=jouling.mission&v=1&mission=mission-library-ac&token=qr_library_ac_2026
 ```
 
-Generated SVG or PNG files are written to `generated-qr/` by default. Camera QR detection uses the browser's `BarcodeDetector` API where available. Camera access requires HTTPS or localhost. Manual mission codes, direct links, `jouling://mission/...` links, and legacy GhostGrid links remain supported as fallbacks.
+Generated SVG or PNG files are written to `generated-qr/` by default. Camera QR detection uses the browser's `BarcodeDetector` API where available. Camera access requires HTTPS or localhost. The participant must scan the physical label or open its QR link; manual mission-code entry is intentionally unavailable. `jouling://mission/...` and legacy GhostGrid QR links remain compatible.
 
 ## Architecture
 

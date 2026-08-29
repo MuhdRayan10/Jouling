@@ -129,15 +129,11 @@
             </div>
             <button class="primary-button" id="startScannerButton"><span aria-hidden="true">⌗</span> Start camera</button>
             <button class="secondary-button" id="demoScanButton">Use featured demo QR</button>
-            <p class="privacy-note"><span aria-hidden="true">◆</span> QR camera frames are processed locally and never uploaded.</p>
+            <p class="privacy-note"><span aria-hidden="true">◆</span> All photos taken are processed and deleted within 24 hours.</p>
           </div>
           <div class="scan-help-card">
             <div class="coach-face" aria-hidden="true"><span>ϟ</span></div>
             <div><strong>Look for approved labels</strong><p>A QR code means the institution has approved the exact action and active hours.</p></div>
-          </div>
-          <div class="manual-entry">
-            <label for="missionCodeInput">Can't scan?</label>
-            <div><input id="missionCodeInput" placeholder="Enter mission code, e.g. CLB-25C" autocomplete="off"><button id="manualCodeButton">Continue</button></div>
           </div>
         </section>
 
@@ -158,27 +154,27 @@
               <div><strong id="heroTeamCredits">$12.40</strong><span>reward pool</span></div>
             </div>
             <div class="team-actions">
-              <button class="light-button" id="shareTeamButton">Share code</button>
+              <button class="light-button" id="shareTeamButton">Add member</button>
               <button class="dark-button" id="openJoinTeamButton">Switch team</button>
             </div>
           </div>
 
           <section class="section-block leaderboard-block">
-            <div class="section-heading"><div><p class="eyebrow">WEEKLY</p><h2>Campus leaderboard</h2></div><span class="season-pill">2d 14h left</span></div>
+            <div class="section-heading"><div><p class="eyebrow">WEEKLY</p><h2>Leaderboard</h2></div><span class="season-pill">2d 14h left</span></div>
             <div class="leaderboard" id="leaderboard"></div>
           </section>
 
           <section class="section-block activity-block">
-            <div class="section-heading"><div><p class="eyebrow">LIVE</p><h2>Team activity</h2></div></div>
+            <div class="section-heading"><div><p class="eyebrow live-label"><i aria-hidden="true"></i>LIVE</p><h2>Updates</h2></div></div>
             <div class="activity-list" id="activityList"></div>
           </section>
         </section>
 
         <section class="app-view" id="view-impact" data-view="impact" aria-labelledby="impactHeading">
           <div class="page-heading compact-heading">
-            <p class="eyebrow">YOUR IMPACT</p>
-            <h1 id="impactHeading">Small actions. Big echo.</h1>
-            <p>Ground truth first, then a human-sized way to feel it.</p>
+            <p class="eyebrow">PRESENTING...</p>
+            <h1 id="impactHeading">Your Jouler Report</h1>
+            <p>Look who's saving the world, one watt at a time.</p>
           </div>
           <div class="planet-card">
             <div class="planet-orbit"><div class="planet" id="planetGraphic"><span>↯</span></div><i></i><b></b></div>
@@ -187,7 +183,7 @@
           <div class="impact-grid">
             <article><span class="impact-icon green">ϟ</span><strong id="impactKwh">18.6</strong><p>verified kWh saved</p></article>
             <article><span class="impact-icon blue">◷</span><strong id="impactMinutes">1,140</strong><p>waste-minutes stopped</p></article>
-            <article><span class="impact-icon gold">$</span><strong id="impactCredits">12.40</strong><p>credits unlocked</p></article>
+            <article><span class="impact-icon territory">⌖</span><strong id="impactAreas">0 sq ft</strong><p>area conquered</p></article>
             <article><span class="impact-icon purple">▲</span><strong id="impactBaseline">24%</strong><p>better than baseline</p></article>
           </div>
           <section class="reward-card">
@@ -198,7 +194,7 @@
           </section>
           <details class="method-card">
             <summary>How Planet Relief is calculated <span>＋</span></summary>
-            <p>We keep kWh as the audited metric. Planet Relief asks what would happen if everyone avoided electricity at the same per-person daily rate, compared with a transparent global daily electricity reference. It is a motivational equivalent—not a claim that literal planets were created or saved.</p>
+            <p>Planet Relief asks what would happen if everyone avoided electricity at the same per-person daily rate, compared with a transparent global daily electricity reference.</p>
           </details>
         </section>
       </main>

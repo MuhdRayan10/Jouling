@@ -248,7 +248,10 @@ function renderImpact() {
   $("#planetReliefValue").textContent = `${(dailyReferenceFraction * 100).toFixed(2)}%`;
   $("#impactKwh").textContent = formatNumber(team.kwhSaved, 2);
   $("#impactMinutes").textContent = formatNumber(Math.round(team.kwhSaved * 61.3), 0);
-  $("#impactCredits").textContent = Number(team.rewardCredits).toFixed(2);
+  const conqueredSqFt = appState.territories
+    .filter((territory) => territory.ownerTeamId === team.id)
+    .reduce((total, territory) => total + Number(territory.areaSqFt || 0), 0);
+  $("#impactAreas").textContent = `${formatNumber(conqueredSqFt, 0)} sq ft`;
   $("#impactBaseline").textContent = `${Math.min(48, Math.max(9, Math.round(team.kwhSaved * 1.3)))}%`;
   $("#walletBalance").textContent = `$${Number(team.rewardCredits).toFixed(2)}`;
   $("#rewardProgress").style.width = `${Math.min(100, (team.rewardCredits / 20) * 100)}%`;
@@ -298,8 +301,6 @@ function parseQrPayload(rawValue) {
   if (!value) throw new Error("QR code was empty");
   const payload = parseJoulingQrPayload(value);
   if (payload) return payload;
-  const mission = appState.missions.find((item) => item.code.toUpperCase() === value.toUpperCase());
-  if (mission) return { missionId: mission.id, token: DEMO_TOKENS[mission.id], protocol: "manual-code", version: "1" };
   throw new Error("That is not a Jouling mission QR");
 }
 
@@ -328,10 +329,10 @@ async function validateQr(missionId, token) {
 
 async function startScanner() {
   if (!("mediaDevices" in navigator) || !navigator.mediaDevices.getUserMedia) {
-    return showToast("Camera scanning needs HTTPS or localhost. Use the mission code below.", "!");
+    return showToast("Camera scanning needs HTTPS or localhost. Open Jouling on your phone at the mission spot.", "!");
   }
   if (!("BarcodeDetector" in window)) {
-    return showToast("This browser lacks native QR detection. Use a mission link or code.", "!");
+    return showToast("This browser lacks QR detection. Use your phone camera to open the Jouling label.", "!");
   }
   try {
     scannerStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
@@ -596,13 +597,6 @@ function bindEvents() {
     const mission = appState.missions.find((item) => item.featured) || appState.missions[0];
     validateQr(mission.id, DEMO_TOKENS[mission.id]);
   });
-  $("#manualCodeButton").addEventListener("click", () => {
-    try {
-      const parsed = parseQrPayload($("#missionCodeInput").value);
-      validateQr(parsed.missionId, parsed.token);
-    } catch (error) { showToast(error.message, "!"); }
-  });
-  $("#missionCodeInput").addEventListener("keydown", (event) => { if (event.key === "Enter") $("#manualCodeButton").click(); });
   $("#proofPhotoInput").addEventListener("change", async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
