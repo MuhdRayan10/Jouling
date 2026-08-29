@@ -11,6 +11,8 @@ npm install
 npm start
 ```
 
+After pulling or merging a branch that changes `package.json`, run `npm install` again before `npm start`. If the machine's global npm cache has permission problems, use the project-local cache instead: `npm install --cache .npm-cache`.
+
 Open [http://localhost:4173](http://localhost:4173). The default seeded participant is Ari on Green Circuit. The featured Central Library mission completes Green Circuit's third node and demonstrates a territory capture.
 
 The campus view uses a locally served MapLibre GL JS client with OpenStreetMap tiles. Panning, zooming, mission filters and territory overlays work in the browser; loading the basemap requires an internet connection.

@@ -288,5 +288,10 @@ test("MapLibre browser assets are served locally as JavaScript and CSS", async (
     const cssResponse = await fetch(`${baseUrl}/vendor/maplibre-gl/maplibre-gl.css`);
     assert.equal(cssResponse.status, 200);
     assert.match(cssResponse.headers.get("content-type"), /text\/css/);
+
+    const jsqrResponse = await fetch(`${baseUrl}/vendor/jsqr/jsqr.mjs`);
+    assert.equal(jsqrResponse.status, 200);
+    assert.match(jsqrResponse.headers.get("content-type"), /text\/javascript/);
+    assert.match(await jsqrResponse.text(), /export default jsQRModule/);
   });
 });
