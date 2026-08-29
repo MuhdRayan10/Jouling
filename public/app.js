@@ -3,7 +3,7 @@ import { LngLatBounds, Map as MapLibreMap, Marker, NavigationControl, ScaleContr
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
-const NUS_CAMPUS_CENTER = [103.7749, 1.2989];
+const NUS_CAMPUS_CENTER = [103.7729, 1.2985];
 const NEARBY_RADIUS_METRES = 800;
 const MAP_STYLE = {
   version: 8,
@@ -25,7 +25,10 @@ const DEMO_TOKENS = {
   "mission-library-ac": "qr_library_ac_2026",
   "mission-utown-screen": "qr_utown_screen_2026",
   "mission-hall-sockets": "qr_hall_sockets_2026",
-  "mission-innovation-door": "qr_innovation_door_2026"
+  "mission-innovation-door": "qr_innovation_door_2026",
+  "mission-e2-lights": "qr_e2_lights_2026",
+  "mission-md6-screen": "qr_md6_screen_2026",
+  "mission-sde4-ac": "qr_sde4_ac_2026"
 };
 
 let appState = null;
@@ -46,6 +49,10 @@ let mapMarkers = [];
 let userLocationMarker = null;
 let lastKnownLocation = null;
 let activeMapFilter = "all";
+let selectedZoneMission = null;
+let demoResetTapCount = 0;
+let demoResetTapTimer = null;
+let demoResetInProgress = false;
 
 const userId = () => localStorage.getItem("jouling.userId") || localStorage.getItem("ghostgrid.userId") || "u-demo";
 
@@ -206,7 +213,58 @@ function territoryGeoJson() {
   };
 }
 
+function zoneCircleCoordinates(zone, steps = 64) {
+  const latitude = Number(zone.center.latitude);
+  const longitude = Number(zone.center.longitude);
+  const latitudeRadius = Number(zone.radiusMeters) / 111_320;
+  const longitudeRadius = latitudeRadius / Math.cos(latitude * Math.PI / 180);
+  return Array.from({ length: steps + 1 }, (_, index) => {
+    const angle = (index / steps) * Math.PI * 2;
+    return [
+      longitude + Math.cos(angle) * longitudeRadius,
+      latitude + Math.sin(angle) * latitudeRadius
+    ];
+  });
+}
+
+function zoneMissionGeoJson() {
+  return {
+    type: "FeatureCollection",
+    features: (appState.zoneMissions || []).map((zone) => ({
+      type: "Feature",
+      id: zone.id,
+      properties: {
+        title: zone.title,
+        color: zone.color,
+        stroke: zone.darkColor,
+        multiplier: zone.xpMultiplier
+      },
+      geometry: { type: "Polygon", coordinates: [zoneCircleCoordinates(zone)] }
+    }))
+  };
+}
+
 function addTerritoryLayers() {
+  campusMap.addSource("zone-missions", { type: "geojson", data: zoneMissionGeoJson() });
+  campusMap.addLayer({
+    id: "zone-mission-fills",
+    type: "fill",
+    source: "zone-missions",
+    paint: {
+      "fill-color": ["get", "color"],
+      "fill-opacity": 0.2
+    }
+  });
+  campusMap.addLayer({
+    id: "zone-mission-outlines",
+    type: "line",
+    source: "zone-missions",
+    paint: {
+      "line-color": ["get", "stroke"],
+      "line-width": 3,
+      "line-dasharray": [1.2, 1.2]
+    }
+  });
   campusMap.addSource("territories", { type: "geojson", data: territoryGeoJson() });
   campusMap.addLayer({
     id: "territory-fills",
@@ -237,7 +295,7 @@ function initCampusMap() {
       container: "mapCanvas",
       style: MAP_STYLE,
       center: NUS_CAMPUS_CENTER,
-      zoom: 14.25,
+      zoom: 13.9,
       minZoom: 10,
       maxZoom: 19,
       pitchWithRotate: false,
@@ -285,6 +343,7 @@ function renderMap(filter = "all") {
   if (!mapStyleReady) return;
 
   campusMap.getSource("territories")?.setData(territoryGeoJson());
+  campusMap.getSource("zone-missions")?.setData(zoneMissionGeoJson());
   clearMapMarkers();
 
   for (const territory of appState.territories) {
@@ -295,6 +354,19 @@ function renderMap(filter = "all") {
     label.textContent = owner.shortName.toUpperCase();
     mapMarkers.push(new Marker({ element: label, anchor: "center" })
       .setLngLat(territoryCentre(territory.polygon))
+      .addTo(campusMap));
+  }
+
+  for (const zone of appState.zoneMissions || []) {
+    const button = document.createElement("button");
+    button.className = "zone-mission-marker";
+    button.style.setProperty("--zone-color", zone.color);
+    button.style.setProperty("--zone-dark", zone.darkColor);
+    button.setAttribute("aria-label", `${zone.title}, team power sweep, ${zone.xpMultiplier} times XP`);
+    button.innerHTML = `<span>${escapeHtml(zone.icon)}</span><b>TEAM SWEEP</b><small>${formatNumber(zone.xpMultiplier, 1)}× XP ZONE</small>`;
+    button.addEventListener("click", () => openZoneMission(zone.id));
+    mapMarkers.push(new Marker({ element: button, anchor: "center" })
+      .setLngLat([zone.center.longitude, zone.center.latitude])
       .addTo(campusMap));
   }
 
@@ -316,14 +388,16 @@ function renderMap(filter = "all") {
   }
 }
 
-function fitMissionBounds(missions = filteredMissions()) {
+function fitMissionBounds(missions = filteredMissions(), includeZones = false) {
   if (!campusMap || !missions.length) return;
-  if (missions.length === 1) {
+  const zones = includeZones ? (appState.zoneMissions || []) : [];
+  if (missions.length === 1 && !zones.length) {
     campusMap.flyTo({ center: missionCoordinates(missions[0]), zoom: 17, duration: 650 });
     return;
   }
   const bounds = new LngLatBounds();
   missions.forEach((mission) => bounds.extend(missionCoordinates(mission)));
+  zones.forEach((zone) => zoneCircleCoordinates(zone, 16).forEach((point) => bounds.extend(point)));
   campusMap.fitBounds(bounds, { padding: { top: 70, right: 55, bottom: 65, left: 55 }, maxZoom: 16.2, duration: 650 });
 }
 
@@ -357,7 +431,9 @@ function locateUser() {
 function renderMissionCarousel() {
   const root = $("#missionCarousel");
   const missions = [...appState.missions]
-    .sort((a, b) => Number(b.featured) - Number(a.featured) || Number(b.active) - Number(a.active))
+    .sort((a, b) => Number(b.featured) - Number(a.featured)
+      || Number(a.completedForTeam) - Number(b.completedForTeam)
+      || Number(b.active) - Number(a.active))
     .slice(0, 5);
   root.innerHTML = missions.map((mission) => `
     <button class="mini-mission-card" data-mission-id="${escapeHtml(mission.id)}">
@@ -372,7 +448,7 @@ function openMission(missionId) {
   if (!mission) return showToast("Mission not found", "!");
   selectedMission = mission;
   const territory = appState.territories.find((item) => item.id === mission.territoryId);
-  const progress = territory?.progress || { completed: 0, required: 3 };
+  const progress = territory?.progress || { completed: 0, required: 1 };
   $("#missionBigIcon").textContent = mission.icon;
   $("#missionDifficulty").textContent = mission.difficulty.toUpperCase();
   $("#missionSheetTitle").textContent = mission.title;
@@ -400,6 +476,20 @@ function openMission(missionId) {
   else if (!mission.active) begin.textContent = mission.availableWindow;
   else begin.textContent = "Scan this mission";
   openSheet("#missionSheet");
+}
+
+function openZoneMission(zoneId) {
+  const zone = (appState.zoneMissions || []).find((item) => item.id === zoneId);
+  if (!zone) return showToast("Sweep zone not found", "!");
+  selectedZoneMission = zone;
+  $("#zoneMissionIcon").textContent = zone.icon;
+  $("#zoneMissionTitle").textContent = zone.title;
+  $("#zoneMissionLocation").textContent = zone.location;
+  $("#zoneMissionDescription").textContent = zone.description;
+  $("#zoneMissionMultiplier").textContent = `${formatNumber(zone.xpMultiplier, 1)}× XP`;
+  $("#zoneMissionInstructions").innerHTML = zone.instructions.map((instruction) => `<li>${escapeHtml(instruction)}</li>`).join("");
+  $("#zoneMissionSafety").textContent = zone.safety;
+  openSheet("#zoneMissionSheet");
 }
 
 function renderTeams() {
@@ -895,6 +985,55 @@ async function shareTeam() {
   }
 }
 
+async function resetDemoSession() {
+  if (demoResetInProgress) return;
+  demoResetInProgress = true;
+  showToast("Restoring the demo session…", "↻");
+  try {
+    const resetState = await api("/api/demo/reset", {
+      method: "POST",
+      body: JSON.stringify({ confirmation: "RESET_JOULING_DEMO" })
+    });
+    localStorage.setItem("jouling.userId", "u-demo");
+    localStorage.removeItem("ghostgrid.userId");
+    stopScanner();
+    closeSheets();
+    closeImpactDetail(false);
+    $("#verifyingOverlay").classList.remove("show");
+    $("#resultOverlay").classList.remove("show", "rejected");
+    selectedMission = null;
+    selectedZoneMission = null;
+    activeAttempt = null;
+    proofDataUrl = null;
+    resultRetryAllowed = false;
+    appState = resetState;
+    $$(".filter-pill").forEach((item) => item.classList.toggle("active", item.dataset.filter === "all"));
+    renderAll();
+    navigate("map");
+    setTimeout(() => fitMissionBounds(appState.missions, true), 100);
+    showToast("Demo reset — all seeded missions are ready again", "↻");
+  } catch (error) {
+    showToast(error.message || "Demo reset failed", "!");
+  } finally {
+    demoResetInProgress = false;
+  }
+}
+
+function handleDemoResetTap(event) {
+  event.stopPropagation();
+  if (demoResetInProgress) return;
+  clearTimeout(demoResetTapTimer);
+  demoResetTapCount += 1;
+  if (demoResetTapCount === 3) showToast("Demo reset armed — tap the bolt twice more", "•••");
+  if (demoResetTapCount === 4) showToast("One more bolt tap to reset", "•");
+  if (demoResetTapCount >= 5) {
+    demoResetTapCount = 0;
+    resetDemoSession();
+    return;
+  }
+  demoResetTapTimer = setTimeout(() => { demoResetTapCount = 0; }, 2500);
+}
+
 function bindEvents() {
   $$('[data-nav]').forEach((button) => button.addEventListener("click", () => navigate(button.dataset.nav)));
   $$('[data-close-sheet]').forEach((button) => button.addEventListener("click", closeSheets));
@@ -914,8 +1053,15 @@ function bindEvents() {
   $("#viewAllMissions").addEventListener("click", () => {
     $$(".filter-pill").forEach((item) => item.classList.toggle("active", item.dataset.filter === "all"));
     renderMap("all");
-    fitMissionBounds(appState.missions);
+    fitMissionBounds(appState.missions, true);
     showToast(`${appState.missions.filter((item) => item.active).length} missions available now`, "⌖");
+  });
+  $("#demoResetTrigger").addEventListener("click", handleDemoResetTap);
+  $("#zoneFocusButton").addEventListener("click", () => {
+    if (!selectedZoneMission) return;
+    const zone = selectedZoneMission;
+    closeSheets();
+    campusMap?.flyTo({ center: [zone.center.longitude, zone.center.latitude], zoom: 15.8, duration: 650 });
   });
   $("#beginMissionButton").addEventListener("click", () => { closeSheets(); navigate("scan"); });
   $("#demoMissionButton").addEventListener("click", () => selectedMission && validateQr(selectedMission.id, DEMO_TOKENS[selectedMission.id]));

@@ -68,6 +68,9 @@ When no key is present, `JOULING_DEMO_VERIFIER=true` accepts a valid image paylo
 3. Take the mandatory proof photo. The approved device and completed room state must be visible.
 4. Submit the image. The backend returns a structured verdict, awards 0.855 kWh, XP and credits, and captures Central Commons.
 5. Open Teams and Impact to see the updated leaderboard, reward wallet and Planet Relief metric.
+6. To replay the pitch, tap the green Jouling bolt in the top-left five times within 2.5 seconds. The guarded demo reset restores the seeded user, team, missions, territory, leaderboard and impact state without exposing a normal reset button.
+
+The map also includes three fresh standalone missions and a purple **Kent Ridge Power Sweep**. The sweep is a second mission format: team members can inspect any approved room inside the circular region for lights, AC, projectors or screens left on unnecessarily, earning a temporary 1.5× XP multiplier.
 
 ## Generate physical QR labels
 
@@ -103,4 +106,4 @@ Generated SVG or PNG files are written to `generated-qr/` by default. Camera QR 
 - `docs/API_CONTRACT.md`: frontend/backend contract and competition semantics.
 - `tests/`: end-to-end API, QR, verification, cooldown, territory and OpenAI request-contract tests.
 
-The MVP intentionally keeps state only for the lifetime of the Node process. Every verified task immediately updates the participant, team, impact, territory, reward, leaderboard, daily-match and activity views; restarting the server resets the demo. Production upgrades would add real authentication, persistent storage, signed/rotating QR tokens, EcoVolt telemetry ingestion, anomaly IDs, object-storage retention policies, admin RBAC and institution-specific schedules.
+The MVP intentionally keeps state only for the lifetime of the Node process. Every verified task immediately updates the participant, team, impact, territory, reward, leaderboard, daily-match and activity views; restarting the server or using the hidden demo reset restores the seeded demo. Production upgrades would add real authentication, persistent storage, signed/rotating QR tokens, EcoVolt telemetry ingestion, anomaly IDs, object-storage retention policies, admin RBAC and institution-specific schedules.

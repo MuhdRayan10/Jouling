@@ -27,6 +27,14 @@ Returns the complete client bootstrap payload: participant, active team, ranked 
 
 Creates a participant and joins the requested team, falling back to the default team when no code is supplied.
 
+### `POST /api/demo/reset`
+
+```json
+{ "confirmation": "RESET_JOULING_DEMO" }
+```
+
+Restores the complete in-memory seed and returns fresh bootstrap state for `u-demo`. The five-tap brand gesture is the only visible client entry point; the exact confirmation guard prevents stray requests from resetting the live pitch session.
+
 ## Teams
 
 ### `POST /api/teams/join`

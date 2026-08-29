@@ -121,6 +121,10 @@ export function createJoulingRequestHandler({ store = new JoulingStore(), verifi
         const body = await readJson(req);
         return sendJson(res, 201, await store.createSession(body));
       }
+      if (req.method === "POST" && url.pathname === "/api/demo/reset") {
+        const body = await readJson(req);
+        return sendJson(res, 200, await store.resetDemo(body));
+      }
       if (req.method === "POST" && url.pathname === "/api/teams/join") {
         const body = await readJson(req);
         return sendJson(res, 200, await store.joinTeam(body));

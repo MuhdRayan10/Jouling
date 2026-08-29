@@ -51,11 +51,20 @@ export class JoulingStore {
       teams: this.leaderboard(),
       dailyMatchup: this.dailyMatchupFor(team.id),
       missions: this.state.missions.map((mission) => publicMission(clone(mission), team.id, now)),
+      zoneMissions: clone(this.state.zoneMissions || []),
       territories: clone(territories),
       activity: clone(this.state.activity.slice(0, 8)),
       rewardPool: Number(this.state.teams.reduce((sum, item) => sum + item.rewardCredits, 0).toFixed(2)),
       serverTime: new Date(now).toISOString()
     };
+  }
+
+  resetDemo({ confirmation } = {}) {
+    if (confirmation !== "RESET_JOULING_DEMO") {
+      throw Object.assign(new Error("Demo reset confirmation was invalid"), { statusCode: 403 });
+    }
+    this.state = clone(createSeedState());
+    return this.bootstrap("u-demo");
   }
 
   leaderboard() {

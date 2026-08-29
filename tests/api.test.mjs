@@ -37,7 +37,15 @@ test("bootstrap returns the map, current team, and competition state", async () 
     assert.equal(response.status, 200);
     assert.equal(payload.user.id, "u-demo");
     assert.equal(payload.team.id, "team-green");
-    assert.equal(payload.missions.length, 6);
+    assert.equal(payload.missions.length, 9);
+    assert.equal(payload.missions.filter((mission) => !mission.completedForTeam).length, 7);
+    assert.deepEqual(
+      payload.missions.slice(-3).map((mission) => mission.id),
+      ["mission-e2-lights", "mission-md6-screen", "mission-sde4-ac"]
+    );
+    assert.equal(payload.zoneMissions.length, 1);
+    assert.equal(payload.zoneMissions[0].kind, "team-sweep");
+    assert.equal(payload.zoneMissions[0].xpMultiplier, 1.5);
     assert.equal(payload.territories.length, 2);
     assert.equal(payload.territories[0].areaSqFt, 18500);
     assert.equal(payload.territories[0].progress.completed, 2);
@@ -137,6 +145,42 @@ test("a resolved location enters cooldown", async () => {
     });
     assert.equal(second.response.status, 409);
     assert.match(second.payload.error.message, /cooling down/i);
+  });
+});
+
+test("the guarded demo reset restores every mutable mission and team metric", async () => {
+  await withServer(async ({ baseUrl }) => {
+    const refused = await json(baseUrl, "/api/demo/reset", {
+      method: "POST",
+      body: JSON.stringify({ confirmation: "wrong" })
+    });
+    assert.equal(refused.response.status, 403);
+
+    const scan = await json(baseUrl, "/api/missions/mission-library-ac/scan", {
+      method: "POST",
+      body: JSON.stringify({ userId: "u-demo", qrToken: "qr_library_ac_2026" })
+    });
+    await json(baseUrl, `/api/attempts/${scan.payload.attempt.id}/verify`, {
+      method: "POST",
+      body: JSON.stringify({ imageDataUrl: TEST_IMAGE })
+    });
+
+    const reset = await json(baseUrl, "/api/demo/reset", {
+      method: "POST",
+      body: JSON.stringify({ confirmation: "RESET_JOULING_DEMO" })
+    });
+    assert.equal(reset.response.status, 200);
+    assert.equal(reset.payload.user.xp, 860);
+    assert.equal(reset.payload.user.weeklyMissions, 4);
+    assert.equal(reset.payload.team.score, 2840);
+    assert.equal(reset.payload.team.kwhSaved, 18.6);
+    assert.equal(reset.payload.team.rewardCredits, 12.4);
+    assert.equal(reset.payload.territories[0].ownerTeamId, "team-gold");
+    assert.equal(reset.payload.territories[0].progress.completed, 2);
+    assert.equal(
+      reset.payload.missions.find((mission) => mission.id === "mission-library-ac").completedForTeam,
+      false
+    );
   });
 });
 
@@ -273,6 +317,7 @@ test("OpenAPI contract is served from the running backend", async () => {
     const { response, payload } = await json(baseUrl, "/api/openapi.json");
     assert.equal(response.status, 200);
     assert.equal(payload.openapi, "3.1.0");
+    assert.ok(payload.paths["/api/demo/reset"]);
     assert.ok(payload.paths["/api/attempts/{attemptId}/verify"]);
     assert.ok(payload.paths["/api/teams/join"]);
   });
