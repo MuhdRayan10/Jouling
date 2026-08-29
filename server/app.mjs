@@ -3,7 +3,7 @@ import { readFile, stat } from "node:fs/promises";
 import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { apiContract } from "./contract.mjs";
-import { GhostGridStore } from "./store.mjs";
+import { JoulingStore } from "./store.mjs";
 import { PhotoVerifier } from "./verifier.mjs";
 
 const HERE = fileURLToPath(new URL(".", import.meta.url));
@@ -76,7 +76,7 @@ async function serveStatic(req, res, url) {
   }
 }
 
-export function createGhostGridServer({ store = new GhostGridStore(), verifier = new PhotoVerifier() } = {}) {
+export function createJoulingServer({ store = new JoulingStore(), verifier = new PhotoVerifier() } = {}) {
   return createHttpServer(async (req, res) => {
     const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
     try {

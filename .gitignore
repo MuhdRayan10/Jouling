@@ -1,4 +1,6 @@
 .env
 node_modules/
+.npm-cache/
 .DS_Store
 data/runtime-state.json
+generated-qr/

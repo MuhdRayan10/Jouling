@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#58cc02">
     <meta name="description" content="Capture campus territory by completing verified energy-saving missions with your team.">
-    <title>GhostGrid</title>
+    <title>Jouling</title>
     <link rel="manifest" href="/manifest.webmanifest">
     <link rel="icon" href="/icon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="/styles.css">
@@ -15,7 +15,7 @@
       <header class="topbar">
         <button class="brand" data-nav="map" aria-label="Go to map">
           <span class="brand-mark" aria-hidden="true"><span>ϟ</span></span>
-          <span class="brand-copy"><strong>GhostGrid</strong><small>ENERGY LEAGUE</small></span>
+          <span class="brand-copy"><strong>Jouling</strong><small>THE ART OF SAVING JOULES</small></span>
         </button>
         <div class="top-stats" aria-label="Player progress">
           <button class="stat-chip streak-chip" data-nav="impact" aria-label="Current streak">
@@ -115,7 +115,7 @@
           <div class="page-heading">
             <p class="eyebrow">PHYSICAL CHECK-IN</p>
             <h1 id="scanHeading">Scan a mission QR</h1>
-            <p>Find the approved GhostGrid label beside a switch or device.</p>
+            <p>Find the approved Jouling label beside a switch or device.</p>
           </div>
           <div class="scanner-card">
             <div class="scanner-window" id="scannerWindow">
@@ -241,7 +241,7 @@
       <label class="photo-drop" id="photoDrop" for="proofPhotoInput">
         <input type="file" id="proofPhotoInput" accept="image/jpeg,image/png,image/webp" capture="environment">
         <img id="proofPreview" alt="Selected proof preview">
-        <div class="photo-placeholder" id="photoPlaceholder"><span>▣</span><strong>Take proof photo</strong><p>Keep the approved switch and room state visible.</p></div>
+        <div class="photo-placeholder" id="photoPlaceholder"><span>▣</span><strong>Take proof photo</strong><p id="photoRequirementText">Keep the approved switch and completed room state visible. A photo is required.</p></div>
       </label>
       <div class="privacy-banner"><span>◆</span><p><strong>Privacy by design</strong>The MVP does not retain your photo after verification.</p></div>
       <button class="primary-button" id="verifyPhotoButton" disabled>Verify with AI</button>
@@ -279,6 +279,7 @@
         <p class="eyebrow" id="resultEyebrow">MISSION VERIFIED</p>
         <h2 id="resultTitle">Territory captured!</h2>
         <p id="resultReason">Central Commons now belongs to Green Circuit.</p>
+        <p class="result-guidance" id="resultGuidance">Your verified impact has been added to the team total.</p>
         <div class="result-stats">
           <div><span>ϟ</span><strong id="resultXp">+120</strong><small>XP</small></div>
           <div><span>◒</span><strong id="resultKwh">0.855</strong><small>kWh</small></div>

@@ -13,7 +13,7 @@ function clone(value) {
   return structuredClone(value);
 }
 
-export class GhostGridStore {
+export class JoulingStore {
   constructor(initialState = createSeedState()) {
     this.state = clone(initialState);
   }
@@ -165,10 +165,12 @@ export class GhostGridStore {
       attempt.status = "expired";
       throw Object.assign(new Error("This attempt expired. Scan the QR again."), { statusCode: 410 });
     }
-    attempt.verification = clone(verification);
+    attempt.lastVerification = clone(verification);
+    attempt.verificationAttempts = (attempt.verificationAttempts || 0) + 1;
     if (!verification.completed || verification.safetyConcern) {
-      attempt.status = "rejected";
-      return { accepted: false, verification: clone(verification), attempt: clone(attempt) };
+      const retryAllowed = !verification.safetyConcern && new Date(attempt.expiresAt).getTime() > Date.now();
+      attempt.status = retryAllowed ? "awaiting_photo" : "rejected";
+      return { accepted: false, retryAllowed, verification: clone(verification), attempt: clone(attempt) };
     }
 
     const kwhSaved = mission.estimatedKwh || calculateAvoidedKwh(mission);
@@ -182,6 +184,7 @@ export class GhostGridStore {
     };
     mission.cooldownUntil = new Date(Date.now() + NODE_COOLDOWN_MS).toISOString();
     attempt.status = "accepted";
+    attempt.verification = clone(verification);
     attempt.completedAt = completedAt;
     attempt.kwhSaved = kwhSaved;
 

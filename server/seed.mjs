@@ -87,7 +87,7 @@ export function createSeedState() {
         icon: "▰",
         map: { x: 28, y: 57 },
         instruction: "Power off the labelled projector after the room is empty.",
-        safety: "Only use the wall controller marked with the GhostGrid QR code.",
+        safety: "Only use the wall controller marked with the Jouling QR code.",
         expectedVisualEvidence: "A projector or controller visibly showing an off, standby, or black-screen state in an empty room.",
         powerBeforeKw: 0.42,
         powerAfterKw: 0.03,

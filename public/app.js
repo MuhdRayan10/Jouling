@@ -1,3 +1,5 @@
+import { parseJoulingQrPayload } from "./qr-protocol.js";
+
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -19,8 +21,9 @@ let proofDataUrl = null;
 let scannerStream = null;
 let scannerTimer = null;
 let toastTimer = null;
+let resultRetryAllowed = false;
 
-const userId = () => localStorage.getItem("ghostgrid.userId") || "u-demo";
+const userId = () => localStorage.getItem("jouling.userId") || localStorage.getItem("ghostgrid.userId") || "u-demo";
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -268,7 +271,8 @@ async function loadState() {
   verifierMode = health.verifierMode;
   renderAll();
   if (verifierMode === "openai") {
-    $("#samplePhotoButton").textContent = "Generate UI sample (live verifier may reject)";
+    $("#samplePhotoButton").hidden = true;
+    $("#photoRequirementText").textContent = "A new photo is mandatory. Make the labelled device and completed room state clearly visible.";
   }
   await handleDeepLink();
 }
@@ -292,18 +296,11 @@ async function handleDeepLink() {
 function parseQrPayload(rawValue) {
   const value = String(rawValue || "").trim();
   if (!value) throw new Error("QR code was empty");
-  if (value.startsWith("ghostgrid://mission/")) {
-    const url = new URL(value);
-    return { missionId: url.pathname.replace(/^\//, ""), token: url.searchParams.get("token") };
-  }
-  try {
-    const url = new URL(value);
-    return { missionId: url.searchParams.get("mission"), token: url.searchParams.get("token") };
-  } catch {
-    const mission = appState.missions.find((item) => item.code.toUpperCase() === value.toUpperCase());
-    if (mission) return { missionId: mission.id, token: DEMO_TOKENS[mission.id] };
-  }
-  throw new Error("That is not a GhostGrid mission QR");
+  const payload = parseJoulingQrPayload(value);
+  if (payload) return payload;
+  const mission = appState.missions.find((item) => item.code.toUpperCase() === value.toUpperCase());
+  if (mission) return { missionId: mission.id, token: DEMO_TOKENS[mission.id], protocol: "manual-code", version: "1" };
+  throw new Error("That is not a Jouling mission QR");
 }
 
 async function validateQr(missionId, token) {
@@ -426,7 +423,7 @@ function createSampleProof() {
   ctx.fillText("OFF", 480, 360);
   ctx.fillStyle = "#536159";
   ctx.font = "700 24px system-ui";
-  ctx.fillText("GhostGrid demo proof • room clear", 480, 485);
+  ctx.fillText("Jouling demo proof • room clear", 480, 485);
   return canvas.toDataURL("image/jpeg", 0.84);
 }
 
@@ -460,7 +457,7 @@ async function verifyProof() {
       renderAll();
       showResult(result);
     } else {
-      showRejectedResult(result.verification);
+      showRejectedResult(result.verification, result.retryAllowed);
     }
   } catch (error) {
     clearInterval(statusTimer);
@@ -486,6 +483,8 @@ function createConfetti() {
 
 function showResult(result) {
   const capture = result.captures?.[0];
+  resultRetryAllowed = false;
+  $("#resultContinueButton").textContent = "See the map";
   $("#resultOverlay").classList.remove("rejected");
   $("#resultBadge").textContent = "✓";
   $("#resultEyebrow").textContent = capture ? "TERRITORY CAPTURED" : "MISSION VERIFIED";
@@ -493,6 +492,7 @@ function showResult(result) {
   $("#resultReason").textContent = capture
     ? `${appState.team.name} completed all three verified nodes and took the zone.`
     : result.verification.reason;
+  $("#resultGuidance").textContent = "Your verified impact has been added to the team total.";
   $("#resultXp").textContent = `+${result.impact.xpEarned}`;
   $("#resultKwh").textContent = formatNumber(result.impact.kwhSaved, 3);
   $("#resultCredit").textContent = Number(result.impact.creditEarned).toFixed(2);
@@ -501,16 +501,30 @@ function showResult(result) {
   if (navigator.vibrate) navigator.vibrate([60, 45, 90]);
 }
 
-function showRejectedResult(verification) {
+function showRejectedResult(verification, retryAllowed = true) {
+  const messages = {
+    room_still_active: ["The energy use is still on", "Switch off only the labelled device after the space is empty, then photograph the completed state."],
+    camera_obscured: ["The camera view is blocked", "Keep fingers away from the lens, clean it if needed, and retake the full scene."],
+    image_unclear: ["We can’t see the result clearly", "Use better lighting, hold still, and include both the labelled device and its visible state."],
+    wrong_device_or_location: ["This does not match the mission", "Return to the QR-labelled location and photograph the exact device named in the task."],
+    required_state_missing: ["Part of the task is not visible", "Include every required condition—for example, both the OFF controller and the closed door."],
+    unsafe_action: ["Stop—this action may be unsafe", "Do not continue or touch electrical panels. Follow the approved mission instructions or contact site staff."],
+    unknown: ["We couldn’t verify this photo", "Retake a clear photo showing the approved device and completed energy-saving state."]
+  };
+  const failureCode = verification.failureCode || "unknown";
+  const [title, fallbackGuidance] = messages[failureCode] || messages.unknown;
+  resultRetryAllowed = Boolean(retryAllowed) && failureCode !== "unsafe_action";
   $("#resultOverlay").classList.add("rejected");
   $("#resultBadge").textContent = "!";
-  $("#resultEyebrow").textContent = "TRY ANOTHER PHOTO";
-  $("#resultTitle").textContent = "Not clear enough yet";
+  $("#resultEyebrow").textContent = failureCode === "unsafe_action" ? "SAFETY CHECK" : "PHOTO NOT VERIFIED";
+  $("#resultTitle").textContent = title;
   $("#resultReason").textContent = verification.reason;
+  $("#resultGuidance").textContent = verification.userGuidance || fallbackGuidance;
   $("#resultXp").textContent = "+0";
   $("#resultKwh").textContent = "0";
   $("#resultCredit").textContent = "0";
   $("#confetti").replaceChildren();
+  $("#resultContinueButton").textContent = resultRetryAllowed ? "Retake photo" : "Back to the map";
   $("#resultOverlay").classList.add("show");
 }
 
@@ -543,9 +557,9 @@ async function createTeam(event) {
 }
 
 async function shareTeam() {
-  const text = `Join ${appState.team.name} on GhostGrid with code ${appState.team.code}`;
+  const text = `Join ${appState.team.name} on Jouling with code ${appState.team.code}`;
   try {
-    if (navigator.share) await navigator.share({ title: "Join my GhostGrid team", text });
+    if (navigator.share) await navigator.share({ title: "Join my Jouling team", text });
     else {
       await navigator.clipboard.writeText(appState.team.code);
       showToast(`Copied team code ${appState.team.code}`);
@@ -601,8 +615,17 @@ function bindEvents() {
   $("#resultContinueButton").addEventListener("click", () => {
     $("#resultOverlay").classList.remove("show", "rejected");
     proofDataUrl = null;
-    activeAttempt = null;
-    navigate("map");
+    $("#photoDrop").classList.remove("has-photo");
+    $("#proofPreview").removeAttribute("src");
+    $("#verifyPhotoButton").disabled = true;
+    if (resultRetryAllowed) {
+      resultRetryAllowed = false;
+      openSheet("#proofSheet");
+    } else {
+      activeAttempt = null;
+      $("#resultContinueButton").textContent = "See the map";
+      navigate("map");
+    }
   });
   $("#openJoinTeamButton").addEventListener("click", () => openSheet("#teamSheet"));
   $("#joinTeamForm").addEventListener("submit", joinTeam);
@@ -613,5 +636,5 @@ function bindEvents() {
 bindEvents();
 loadState().catch((error) => {
   console.error(error);
-  showToast("GhostGrid could not load. Is the server running?", "!");
+  showToast("Jouling could not load. Is the server running?", "!");
 });

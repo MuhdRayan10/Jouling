@@ -1,9 +1,9 @@
 export const apiContract = {
   openapi: "3.1.0",
   info: {
-    title: "GhostGrid MVP API",
+    title: "Jouling MVP API",
     version: "1.0.0",
-    description: "Contract between the mobile web client and the GhostGrid mission, team, territory, and proof-verification backend."
+    description: "Contract between the Jouling mobile client and its mission, team, territory, and proof-verification backend."
   },
   servers: [{ url: "/" }],
   paths: {

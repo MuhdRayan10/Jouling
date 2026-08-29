@@ -1,6 +1,6 @@
-# GhostGrid API contract
+# Jouling API contract
 
-The mobile client communicates only with the GhostGrid backend. The OpenAI API key is never sent to the browser. A machine-readable OpenAPI 3.1 summary is available from `GET /api/openapi.json` while the server is running.
+The mobile client communicates only with the Jouling backend. The OpenAI API key is never sent to the browser. A machine-readable OpenAPI 3.1 summary is available from `GET /api/openapi.json` while the server is running.
 
 All responses use JSON. Errors have this shape:
 
@@ -56,7 +56,13 @@ Creates a team, generates an invite code, and moves the participant into it.
 }
 ```
 
-The backend checks the QR token, active window and location cooldown, then creates a ten-minute attempt. The QR should encode either a GhostGrid URL such as `https://host/?mission=mission-library-ac&token=qr_library_ac_2026` or the equivalent `ghostgrid://mission/...` payload.
+The backend checks the QR token, active window and location cooldown, then creates a ten-minute attempt. The canonical v1 QR schema is:
+
+```text
+https://host/?protocol=jouling.mission&v=1&mission=mission-library-ac&token=qr_library_ac_2026
+```
+
+The shared `public/qr-protocol.js` module builds and parses this exact schema for both the app and `scripts/generate-qr.mjs`. The scanner also accepts `jouling://mission/...` and legacy GhostGrid payloads.
 
 ### `POST /api/attempts/{attemptId}/verify`
 
@@ -64,7 +70,9 @@ The backend checks the QR token, active window and location cooldown, then creat
 { "imageDataUrl": "data:image/jpeg;base64,..." }
 ```
 
-The backend validates and forwards the image to the OpenAI Responses API with the mission-specific completion and safety criteria. The structured verdict is applied atomically: accepted missions award XP, estimated/verified kWh, credits, node progress and any resulting territory capture. The photo itself is not retained in the in-memory MVP store.
+The backend validates and forwards the image to the OpenAI Responses API with the mission-specific completion and safety criteria. The structured verdict contains completion, confidence, a failure code, observed state, a reason, user guidance and a safety flag. Supported failure codes are `room_still_active`, `camera_obscured`, `image_unclear`, `wrong_device_or_location`, `required_state_missing`, and `unsafe_action`.
+
+Accepted missions atomically award XP, estimated/verified kWh, credits, node progress and any resulting territory capture. Retryable failures keep the ten-minute attempt open so the UI can request another photo. The photo itself is not retained in the in-memory MVP store.
 
 ## Competition rules
 
@@ -76,4 +84,4 @@ The backend validates and forwards the image to the OpenAI Responses API with th
 
 ## Live verification configuration
 
-Set `OPENAI_API_KEY` on the server and optionally override `OPENAI_VISION_MODEL`. Without a key, `GHOSTGRID_DEMO_VERIFIER=true` accepts a valid proof-image payload so the whole product loop can be demonstrated offline. Production should set demo mode to `false`.
+Set `OPENAI_API_KEY` on the server and optionally override `OPENAI_VISION_MODEL`. Without a key, `JOULING_DEMO_VERIFIER=true` accepts a valid proof-image payload so the whole product loop can be demonstrated offline. Production should set demo mode to `false`.

@@ -1,17 +1,18 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { once } from "node:events";
-import { createGhostGridServer } from "../server/app.mjs";
-import { GhostGridStore } from "../server/store.mjs";
+import { createJoulingServer } from "../server/app.mjs";
+import { JoulingStore } from "../server/store.mjs";
 import { PhotoVerifier } from "../server/verifier.mjs";
 import { calculateAvoidedKwh, territoryProgress } from "../server/logic.mjs";
+import { buildJoulingQrPayload, parseJoulingQrPayload } from "../public/qr-protocol.js";
 
-const ONE_PIXEL_PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+const TEST_IMAGE = `data:image/png;base64,${Buffer.alloc(2048, 1).toString("base64")}`;
 
 async function withServer(run, options = {}) {
-  const store = options.store || new GhostGridStore();
+  const store = options.store || new JoulingStore();
   const verifier = options.verifier || new PhotoVerifier({ apiKey: null, demoMode: true });
-  const server = createGhostGridServer({ store, verifier });
+  const server = createJoulingServer({ store, verifier });
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
   const { port } = server.address();
@@ -93,7 +94,7 @@ test("verified proof awards impact and captures a three-node territory", async (
 
     const verified = await json(baseUrl, `/api/attempts/${scan.payload.attempt.id}/verify`, {
       method: "POST",
-      body: JSON.stringify({ imageDataUrl: ONE_PIXEL_PNG })
+      body: JSON.stringify({ imageDataUrl: TEST_IMAGE })
     });
     assert.equal(verified.response.status, 200);
     assert.equal(verified.payload.accepted, true);
@@ -113,7 +114,7 @@ test("a resolved location enters cooldown", async () => {
     });
     await json(baseUrl, `/api/attempts/${scan.payload.attempt.id}/verify`, {
       method: "POST",
-      body: JSON.stringify({ imageDataUrl: ONE_PIXEL_PNG })
+      body: JSON.stringify({ imageDataUrl: TEST_IMAGE })
     });
     const second = await json(baseUrl, "/api/missions/mission-library-ac/scan", {
       method: "POST",
@@ -137,28 +138,96 @@ test("OpenAI verifier sends image input and requests strict structured output", 
         output_text: JSON.stringify({
           completed: true,
           confidence: 0.93,
+          failure_code: "none",
           reason: "Controller is visibly off.",
           observed_state: "Off state visible",
+          user_guidance: "No further action needed.",
           safety_concern: false
         })
       }), { status: 200, headers: { "Content-Type": "application/json" } });
     }
   });
-  const mission = new GhostGridStore().findMission("mission-library-ac");
-  const result = await verifier.verify({ mission, imageDataUrl: ONE_PIXEL_PNG, userId: "u-demo" });
+  const mission = new JoulingStore().findMission("mission-library-ac");
+  const result = await verifier.verify({ mission, imageDataUrl: TEST_IMAGE, userId: "u-demo" });
   assert.equal(result.completed, true);
   assert.equal(capturedRequest.url, "https://api.openai.com/v1/responses");
   assert.equal(capturedRequest.options.headers.Authorization, "Bearer test-key");
   assert.equal(capturedRequest.body.input[0].content[1].type, "input_image");
-  assert.equal(capturedRequest.body.input[0].content[1].image_url, ONE_PIXEL_PNG);
+  assert.equal(capturedRequest.body.input[0].content[1].image_url, TEST_IMAGE);
+  assert.equal(capturedRequest.body.input[0].content[1].detail, "high");
   assert.equal(capturedRequest.body.text.format.type, "json_schema");
   assert.equal(capturedRequest.body.text.format.strict, true);
+  assert.ok(capturedRequest.body.text.format.schema.required.includes("failure_code"));
+  assert.match(capturedRequest.body.input[0].content[0].text, /camera_obscured/);
+  assert.match(capturedRequest.body.input[0].content[0].text, /room_still_active/);
   assert.equal(capturedRequest.body.store, false);
+});
+
+test("a proof photo is mandatory and tiny payloads are rejected", async () => {
+  await withServer(async ({ baseUrl }) => {
+    const scan = await json(baseUrl, "/api/missions/mission-library-ac/scan", {
+      method: "POST",
+      body: JSON.stringify({ userId: "u-demo", qrToken: "qr_library_ac_2026" })
+    });
+    const missing = await json(baseUrl, `/api/attempts/${scan.payload.attempt.id}/verify`, {
+      method: "POST",
+      body: JSON.stringify({})
+    });
+    assert.equal(missing.response.status, 400);
+    assert.match(missing.payload.error.message, /photo is required/i);
+  });
+});
+
+test("unclear proof returns actionable feedback and keeps the attempt open", async () => {
+  const verifier = {
+    async verify() {
+      return {
+        completed: false,
+        confidence: 0.31,
+        failureCode: "camera_obscured",
+        reason: "Most of the image is covered, so the controller state cannot be seen.",
+        observedState: "Dark frame with no readable device.",
+        userGuidance: "Move your finger away from the lens and retake the full scene.",
+        safetyConcern: false,
+        mode: "test"
+      };
+    }
+  };
+  await withServer(async ({ baseUrl }) => {
+    const scan = await json(baseUrl, "/api/missions/mission-library-ac/scan", {
+      method: "POST",
+      body: JSON.stringify({ userId: "u-demo", qrToken: "qr_library_ac_2026" })
+    });
+    const rejected = await json(baseUrl, `/api/attempts/${scan.payload.attempt.id}/verify`, {
+      method: "POST",
+      body: JSON.stringify({ imageDataUrl: TEST_IMAGE })
+    });
+    assert.equal(rejected.response.status, 200);
+    assert.equal(rejected.payload.accepted, false);
+    assert.equal(rejected.payload.retryAllowed, true);
+    assert.equal(rejected.payload.verification.failureCode, "camera_obscured");
+    assert.equal(rejected.payload.attempt.status, "awaiting_photo");
+    assert.equal(rejected.payload.attempt.verificationAttempts, 1);
+  }, { verifier });
+});
+
+test("Jouling QR generator and scanner share the v1 payload schema", () => {
+  const payload = buildJoulingQrPayload({
+    origin: "https://jouling.example",
+    missionId: "mission-library-ac",
+    token: "signed-token"
+  });
+  const parsed = parseJoulingQrPayload(payload);
+  assert.equal(parsed.protocol, "jouling.mission");
+  assert.equal(parsed.version, "1");
+  assert.equal(parsed.missionId, "mission-library-ac");
+  assert.equal(parsed.token, "signed-token");
+  assert.equal(parseJoulingQrPayload("jouling://mission/mission-library-ac?v=1&token=signed-token").missionId, "mission-library-ac");
 });
 
 test("energy and territory calculations are deterministic", () => {
   assert.equal(calculateAvoidedKwh({ powerBeforeKw: 1.2, powerAfterKw: 0, avoidedMinutes: 45 }), 0.9);
-  const store = new GhostGridStore();
+  const store = new JoulingStore();
   const progress = territoryProgress(store.state.territories[0], store.state.missions, "team-green");
   assert.equal(progress.completed, 2);
   assert.equal(progress.percent, 67);
