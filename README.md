@@ -13,6 +13,8 @@ npm start
 
 Open [http://localhost:4173](http://localhost:4173). The default seeded participant is Ari on Green Circuit. The featured Central Library mission completes Green Circuit's third node and demonstrates a territory capture.
 
+The campus view uses a locally served MapLibre GL JS client with OpenStreetMap tiles. Panning, zooming, mission filters and territory overlays work in the browser; loading the basemap requires an internet connection.
+
 To run the automated tests:
 
 ```bash
@@ -61,7 +63,7 @@ Generated SVG or PNG files are written to `generated-qr/` by default. Camera QR 
 
 ## Architecture
 
-- `public/`: responsive web UI, campus map, QR scanner, camera proof flow, shared QR protocol, team league and impact screens.
+- `public/`: responsive web UI, navigable MapLibre campus map, QR scanner, camera proof flow, shared QR protocol, team league and impact screens.
 - `server/`: dependency-free Node HTTP server, in-memory session state, game rules and OpenAI photo verifier.
 - `scripts/generate-qr.mjs`: standalone SVG/PNG label generator using the shared Jouling QR v1 schema.
 - `docs/API_CONTRACT.md`: frontend/backend contract and competition semantics.

@@ -8,7 +8,8 @@
     <title>Jouling</title>
     <link rel="manifest" href="/manifest.webmanifest">
     <link rel="icon" href="/icon.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="/styles.css">
+    <link rel="stylesheet" href="/vendor/maplibre-gl/maplibre-gl.css">
+    <link rel="stylesheet" href="/styles.css?v=maplibre-1">
   </head>
   <body>
     <div class="app-shell" id="appShell">
@@ -58,45 +59,11 @@
               <button class="filter-pill" data-filter="high">High impact</button>
             </div>
             <div class="campus-map" id="campusMap" role="application" aria-label="Interactive campus mission map">
-              <svg class="map-art" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-                <defs>
-                  <pattern id="smallGrid" width="10" height="10" patternUnits="userSpaceOnUse">
-                    <path d="M 10 0 L 0 0 0 10" fill="none" stroke="#dce9df" stroke-width="0.45"/>
-                  </pattern>
-                  <filter id="territoryShadow" x="-20%" y="-20%" width="140%" height="140%">
-                    <feDropShadow dx="0" dy="1" stdDeviation="1" flood-opacity="0.16"/>
-                  </filter>
-                </defs>
-                <rect width="100" height="100" fill="#f4f8f1"/>
-                <rect width="100" height="100" fill="url(#smallGrid)" opacity="0.65"/>
-                <path d="M-5,81 C18,69 28,73 46,61 C64,50 69,35 105,28" class="map-road major"/>
-                <path d="M10,-8 C14,21 18,35 33,47 C50,61 69,70 93,106" class="map-road"/>
-                <path d="M-4,28 C23,34 42,29 55,19 C67,10 79,8 105,13" class="map-road"/>
-                <path d="M61,-7 C58,17 60,34 76,48 C87,58 93,70 100,83" class="map-road minor"/>
-                <g class="water-feature">
-                  <path d="M0,90 C22,80 30,86 45,78 C61,70 72,69 100,60 L100,100 L0,100 Z"/>
-                </g>
-                <g class="building-shapes">
-                  <rect x="17" y="47" width="16" height="12" rx="2"/>
-                  <rect x="40" y="26" width="18" height="12" rx="2"/>
-                  <rect x="63" y="50" width="15" height="13" rx="2"/>
-                  <rect x="74" y="17" width="14" height="9" rx="2"/>
-                  <rect x="82" y="36" width="13" height="11" rx="2"/>
-                  <rect x="61" y="10" width="9" height="8" rx="2"/>
-                  <rect x="8" y="19" width="13" height="9" rx="2"/>
-                </g>
-                <g id="territoryLayer"></g>
-                <g class="map-labels">
-                  <text x="19" y="46">COM3</text>
-                  <text x="42" y="25">CENTRAL LIBRARY</text>
-                  <text x="75" y="16">UTOWN</text>
-                  <text x="82" y="35">INNOVATION 4.0</text>
-                </g>
-              </svg>
-              <div id="missionMarkers"></div>
+              <div class="maplibre-canvas" id="mapCanvas" aria-label="Navigable NUS campus map"></div>
+              <div class="map-loading" id="mapLoading" role="status"><i></i><span>Loading NUS campus map…</span></div>
               <div class="map-legend">
                 <span><i class="legend-dot available"></i>Available</span>
-                <span><i class="legend-dot owned"></i>Your team</span>
+                <span><i class="legend-dot owned"></i>Team territory</span>
                 <span><i class="legend-dot locked"></i>Unavailable</span>
               </div>
             </div>
@@ -320,6 +287,6 @@
     </div>
 
     <div class="toast" id="toast" role="status" aria-live="polite"><span id="toastIcon">✓</span><p id="toastText">Updated</p></div>
-    <script type="module" src="/app.js"></script>
+    <script type="module" src="/app.js?v=maplibre-1"></script>
   </body>
 </html>

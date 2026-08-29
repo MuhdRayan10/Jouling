@@ -1,8 +1,23 @@
 import { parseJoulingQrPayload } from "./qr-protocol.js";
+import { LngLatBounds, Map as MapLibreMap, Marker, NavigationControl, ScaleControl } from "/vendor/maplibre-gl/maplibre-gl.mjs";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
-const SVG_NS = "http://www.w3.org/2000/svg";
+const NUS_CAMPUS_CENTER = [103.7749, 1.2989];
+const NEARBY_RADIUS_METRES = 800;
+const MAP_STYLE = {
+  version: 8,
+  sources: {
+    openstreetmap: {
+      type: "raster",
+      tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+      tileSize: 256,
+      maxzoom: 19,
+      attribution: "© OpenStreetMap contributors"
+    }
+  },
+  layers: [{ id: "openstreetmap", type: "raster", source: "openstreetmap" }]
+};
 
 const DEMO_TOKENS = {
   "mission-com3-projector": "qr_com3_projector_2026",
@@ -24,6 +39,12 @@ let toastTimer = null;
 let resultRetryAllowed = false;
 let matchCountdownTimer = null;
 let lastImpactTrigger = null;
+let campusMap = null;
+let mapStyleReady = false;
+let mapMarkers = [];
+let userLocationMarker = null;
+let lastKnownLocation = null;
+let activeMapFilter = "all";
 
 const userId = () => localStorage.getItem("jouling.userId") || localStorage.getItem("ghostgrid.userId") || "u-demo";
 
@@ -83,6 +104,7 @@ function navigate(view) {
   $$(".bottom-nav button").forEach((button) => button.classList.toggle("active", button.dataset.nav === view));
   window.scrollTo({ top: 0, behavior: "smooth" });
   if (view === "scan") setTimeout(() => $("#startScannerButton").focus(), 250);
+  if (view === "map") setTimeout(() => campusMap?.resize(), 80);
 }
 
 function formatCountdown(endsAt) {
@@ -131,53 +153,196 @@ function ordinal(value) {
   return `${value}th`;
 }
 
-function renderMap(filter = "all") {
-  const territoryLayer = $("#territoryLayer");
-  territoryLayer.replaceChildren();
-  for (const territory of appState.territories) {
-    const owner = teamById(territory.ownerTeamId) || appState.team;
-    const polygon = document.createElementNS(SVG_NS, "polygon");
-    polygon.setAttribute("points", territory.polygon.map(([x, y]) => `${x},${y}`).join(" "));
-    polygon.setAttribute("fill", `${owner.color}38`);
-    polygon.setAttribute("stroke", owner.darkColor || owner.color);
-    polygon.setAttribute("class", "territory-polygon");
-    polygon.dataset.territoryId = territory.id;
-    territoryLayer.append(polygon);
+function missionCoordinates(mission) {
+  return [Number(mission.map.longitude), Number(mission.map.latitude)];
+}
 
-    const centre = territory.polygon.reduce((acc, point) => [acc[0] + point[0] / territory.polygon.length, acc[1] + point[1] / territory.polygon.length], [0, 0]);
-    const label = document.createElementNS(SVG_NS, "text");
-    label.setAttribute("x", centre[0]);
-    label.setAttribute("y", centre[1] + 2);
-    label.setAttribute("text-anchor", "middle");
-    label.setAttribute("fill", owner.darkColor || owner.color);
-    label.setAttribute("class", "territory-label-pill");
-    label.textContent = owner.shortName.toUpperCase();
-    territoryLayer.append(label);
-  }
+function distanceMetres([fromLongitude, fromLatitude], [toLongitude, toLatitude]) {
+  const radians = (degrees) => degrees * Math.PI / 180;
+  const latitudeDelta = radians(toLatitude - fromLatitude);
+  const longitudeDelta = radians(toLongitude - fromLongitude);
+  const a = Math.sin(latitudeDelta / 2) ** 2
+    + Math.cos(radians(fromLatitude)) * Math.cos(radians(toLatitude)) * Math.sin(longitudeDelta / 2) ** 2;
+  return 6_371_000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
-  const markerRoot = $("#missionMarkers");
-  markerRoot.replaceChildren();
-  const missions = appState.missions.filter((mission) => {
+function filteredMissions(filter = activeMapFilter) {
+  const origin = lastKnownLocation || NUS_CAMPUS_CENTER;
+  return appState.missions.filter((mission) => {
     if (filter === "high") return mission.estimatedKwh >= 0.8;
-    if (filter === "nearby") return mission.map.x < 72;
+    if (filter === "nearby") return distanceMetres(origin, missionCoordinates(mission)) <= NEARBY_RADIUS_METRES;
     return true;
   });
-  for (const mission of missions) {
+}
+
+function territoryGeoJson() {
+  return {
+    type: "FeatureCollection",
+    features: appState.territories.map((territory) => {
+      const owner = teamById(territory.ownerTeamId) || appState.team;
+      const ring = territory.polygon.map(([longitude, latitude]) => [Number(longitude), Number(latitude)]);
+      if (ring.length && (ring[0][0] !== ring.at(-1)[0] || ring[0][1] !== ring.at(-1)[1])) ring.push([...ring[0]]);
+      return {
+        type: "Feature",
+        id: territory.id,
+        properties: {
+          name: territory.name,
+          owner: owner.shortName.toUpperCase(),
+          color: owner.color,
+          stroke: owner.darkColor || owner.color
+        },
+        geometry: { type: "Polygon", coordinates: [ring] }
+      };
+    })
+  };
+}
+
+function addTerritoryLayers() {
+  campusMap.addSource("territories", { type: "geojson", data: territoryGeoJson() });
+  campusMap.addLayer({
+    id: "territory-fills",
+    type: "fill",
+    source: "territories",
+    paint: {
+      "fill-color": ["get", "color"],
+      "fill-opacity": 0.22
+    }
+  });
+  campusMap.addLayer({
+    id: "territory-outlines",
+    type: "line",
+    source: "territories",
+    paint: {
+      "line-color": ["get", "stroke"],
+      "line-width": 3,
+      "line-dasharray": [2, 1.5]
+    }
+  });
+}
+
+function initCampusMap() {
+  if (campusMap) return;
+  const loading = $("#mapLoading");
+  try {
+    campusMap = new MapLibreMap({
+      container: "mapCanvas",
+      style: MAP_STYLE,
+      center: NUS_CAMPUS_CENTER,
+      zoom: 14.25,
+      minZoom: 10,
+      maxZoom: 19,
+      pitchWithRotate: false,
+      dragRotate: false,
+      cooperativeGestures: false,
+      attributionControl: true
+    });
+    campusMap.addControl(new NavigationControl({ showCompass: false, visualizePitch: false }), "top-right");
+    campusMap.addControl(new ScaleControl({ maxWidth: 90, unit: "metric" }), "bottom-right");
+    campusMap.on("load", () => {
+      addTerritoryLayers();
+      mapStyleReady = true;
+      loading.classList.add("hidden");
+      loading.setAttribute("aria-hidden", "true");
+      renderMap(activeMapFilter);
+    });
+    campusMap.on("error", (event) => {
+      if (!mapStyleReady && event?.error) {
+        loading.classList.add("error");
+        loading.querySelector("span").textContent = "Basemap unavailable — mission nodes are still active";
+      }
+    });
+  } catch (error) {
+    console.error(error);
+    loading.classList.add("error");
+    loading.querySelector("span").textContent = "This browser could not start the interactive map";
+  }
+}
+
+function clearMapMarkers() {
+  for (const marker of mapMarkers) marker.remove();
+  mapMarkers = [];
+}
+
+function territoryCentre(polygon) {
+  return polygon.reduce((centre, [longitude, latitude]) => [
+    centre[0] + Number(longitude) / polygon.length,
+    centre[1] + Number(latitude) / polygon.length
+  ], [0, 0]);
+}
+
+function renderMap(filter = "all") {
+  activeMapFilter = filter;
+  initCampusMap();
+  if (!mapStyleReady) return;
+
+  campusMap.getSource("territories")?.setData(territoryGeoJson());
+  clearMapMarkers();
+
+  for (const territory of appState.territories) {
+    const owner = teamById(territory.ownerTeamId) || appState.team;
+    const label = document.createElement("div");
+    label.className = "territory-map-label";
+    label.style.setProperty("--territory-color", owner.darkColor || owner.color);
+    label.textContent = owner.shortName.toUpperCase();
+    mapMarkers.push(new Marker({ element: label, anchor: "center" })
+      .setLngLat(territoryCentre(territory.polygon))
+      .addTo(campusMap));
+  }
+
+  for (const mission of filteredMissions(filter)) {
     const button = document.createElement("button");
     const classes = ["mission-marker"];
     if (mission.featured) classes.push("featured");
     if (mission.completedForTeam) classes.push("completed");
     if (!mission.active || mission.cooldownActive) classes.push("locked");
     button.className = classes.join(" ");
-    button.style.left = `${mission.map.x}%`;
-    button.style.top = `${mission.map.y}%`;
     button.setAttribute("aria-label", `${mission.title}, ${mission.location}`);
     button.innerHTML = `
       ${mission.featured && !mission.completedForTeam ? `<span class="marker-bubble"><b>1 node to capture!</b><small>${escapeHtml(mission.shortTitle)} • ${formatNumber(mission.estimatedKwh, 3)} kWh</small></span>` : ""}
       <span class="marker-pin"><span>${escapeHtml(mission.icon)}</span></span>`;
     button.addEventListener("click", () => openMission(mission.id));
-    markerRoot.append(button);
+    mapMarkers.push(new Marker({ element: button, anchor: "bottom" })
+      .setLngLat(missionCoordinates(mission))
+      .addTo(campusMap));
   }
+}
+
+function fitMissionBounds(missions = filteredMissions()) {
+  if (!campusMap || !missions.length) return;
+  if (missions.length === 1) {
+    campusMap.flyTo({ center: missionCoordinates(missions[0]), zoom: 17, duration: 650 });
+    return;
+  }
+  const bounds = new LngLatBounds();
+  missions.forEach((mission) => bounds.extend(missionCoordinates(mission)));
+  campusMap.fitBounds(bounds, { padding: { top: 70, right: 55, bottom: 65, left: 55 }, maxZoom: 16.2, duration: 650 });
+}
+
+function locateUser() {
+  $$(".filter-pill").forEach((item) => item.classList.toggle("active", item.dataset.filter === "nearby"));
+  if (!navigator.geolocation) {
+    lastKnownLocation = NUS_CAMPUS_CENTER;
+    renderMap("nearby");
+    fitMissionBounds();
+    return showToast("Location is unavailable — showing missions near central campus", "◎");
+  }
+  showToast("Finding your campus position…", "◎");
+  navigator.geolocation.getCurrentPosition(({ coords }) => {
+    lastKnownLocation = [coords.longitude, coords.latitude];
+    userLocationMarker?.remove();
+    const marker = document.createElement("div");
+    marker.className = "user-location-marker";
+    marker.setAttribute("aria-label", "Your location");
+    userLocationMarker = new Marker({ element: marker }).setLngLat(lastKnownLocation).addTo(campusMap);
+    renderMap("nearby");
+    campusMap.flyTo({ center: lastKnownLocation, zoom: 16.2, duration: 700 });
+    showToast(`${filteredMissions("nearby").length} missions within 800 m`, "◎");
+  }, () => {
+    lastKnownLocation = NUS_CAMPUS_CENTER;
+    renderMap("nearby");
+    fitMissionBounds();
+    showToast("Location permission was not available — using central campus", "◎");
+  }, { enableHighAccuracy: true, timeout: 7000, maximumAge: 60_000 });
 }
 
 function renderMissionCarousel() {
@@ -705,12 +870,13 @@ function bindEvents() {
     $$(".filter-pill").forEach((item) => item.classList.toggle("active", item === button));
     renderMap(button.dataset.filter);
   }));
-  $("#locateButton").addEventListener("click", () => {
-    $$(".filter-pill").forEach((item) => item.classList.toggle("active", item.dataset.filter === "nearby"));
-    renderMap("nearby");
-    showToast("Showing missions along your campus route", "◎");
+  $("#locateButton").addEventListener("click", locateUser);
+  $("#viewAllMissions").addEventListener("click", () => {
+    $$(".filter-pill").forEach((item) => item.classList.toggle("active", item.dataset.filter === "all"));
+    renderMap("all");
+    fitMissionBounds(appState.missions);
+    showToast(`${appState.missions.filter((item) => item.active).length} missions available now`, "⌖");
   });
-  $("#viewAllMissions").addEventListener("click", () => showToast(`${appState.missions.filter((item) => item.active).length} missions available now`, "⌖"));
   $("#beginMissionButton").addEventListener("click", () => { closeSheets(); navigate("scan"); });
   $("#demoMissionButton").addEventListener("click", () => selectedMission && validateQr(selectedMission.id, DEMO_TOKENS[selectedMission.id]));
   $("#startScannerButton").addEventListener("click", startScanner);

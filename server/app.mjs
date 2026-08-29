@@ -1,6 +1,6 @@
 import { createServer as createHttpServer } from "node:http";
 import { readFile, stat } from "node:fs/promises";
-import { extname, join, normalize, resolve } from "node:path";
+import { extname, isAbsolute, join, normalize, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { apiContract } from "./contract.mjs";
 import { JoulingStore } from "./store.mjs";
@@ -8,12 +8,14 @@ import { PhotoVerifier } from "./verifier.mjs";
 
 const HERE = fileURLToPath(new URL(".", import.meta.url));
 const PUBLIC_DIR = resolve(HERE, "../public");
+const MAPLIBRE_DIST_DIR = resolve(HERE, "../node_modules/maplibre-gl/dist");
 const MAX_JSON_BYTES = 7 * 1024 * 1024;
 
 const CONTENT_TYPES = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
+  ".mjs": "text/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
   ".svg": "image/svg+xml",
   ".png": "image/png",
@@ -50,9 +52,13 @@ async function readJson(req) {
 
 async function serveStatic(req, res, url) {
   const pathname = decodeURIComponent(url.pathname === "/" ? "/index.html" : url.pathname);
-  const safePath = normalize(pathname).replace(/^(\.\.(\/|\\|$))+/, "");
-  let filePath = resolve(join(PUBLIC_DIR, safePath));
-  if (!filePath.startsWith(PUBLIC_DIR)) return false;
+  const vendorPrefix = "/vendor/maplibre-gl/";
+  const rootDirectory = pathname.startsWith(vendorPrefix) ? MAPLIBRE_DIST_DIR : PUBLIC_DIR;
+  const relativePath = pathname.startsWith(vendorPrefix) ? pathname.slice(vendorPrefix.length) : pathname.replace(/^\/+/, "");
+  const safePath = normalize(relativePath);
+  if (isAbsolute(safePath) || safePath === ".." || safePath.startsWith(`..${sep}`)) return false;
+  let filePath = resolve(join(rootDirectory, safePath));
+  if (filePath !== rootDirectory && !filePath.startsWith(`${rootDirectory}${sep}`)) return false;
   try {
     let fileStat = await stat(filePath);
     if (fileStat.isDirectory()) {
@@ -60,14 +66,16 @@ async function serveStatic(req, res, url) {
       fileStat = await stat(filePath);
     }
     const body = await readFile(filePath);
+    const extension = extname(filePath);
+    const sourceAsset = [".html", ".css", ".js", ".mjs"].includes(extension);
     res.writeHead(200, {
-      "Content-Type": CONTENT_TYPES[extname(filePath)] || "application/octet-stream",
+      "Content-Type": CONTENT_TYPES[extension] || "application/octet-stream",
       "Content-Length": body.length,
-      "Cache-Control": extname(filePath) === ".html" ? "no-cache" : "public, max-age=300",
+      "Cache-Control": sourceAsset ? "no-cache" : "public, max-age=300",
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "same-origin",
       "Permissions-Policy": "camera=(self), geolocation=(self)",
-      "Content-Security-Policy": "default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; style-src 'self'; script-src 'self'; connect-src 'self'; font-src 'self'; frame-ancestors 'none'"
+      "Content-Security-Policy": "default-src 'self'; img-src 'self' data: blob: https://tile.openstreetmap.org; media-src 'self' blob:; style-src 'self'; script-src 'self'; connect-src 'self' https://tile.openstreetmap.org; worker-src 'self' blob:; font-src 'self'; frame-ancestors 'none'"
     });
     res.end(body);
     return true;

@@ -257,3 +257,16 @@ test("OpenAPI contract is served from the running backend", async () => {
     assert.ok(payload.paths["/api/teams/join"]);
   });
 });
+
+test("MapLibre browser assets are served locally as JavaScript and CSS", async () => {
+  await withServer(async ({ baseUrl }) => {
+    const moduleResponse = await fetch(`${baseUrl}/vendor/maplibre-gl/maplibre-gl.mjs`);
+    assert.equal(moduleResponse.status, 200);
+    assert.match(moduleResponse.headers.get("content-type"), /text\/javascript/);
+    assert.match(await moduleResponse.text(), /MapLibre GL JS/);
+
+    const cssResponse = await fetch(`${baseUrl}/vendor/maplibre-gl/maplibre-gl.css`);
+    assert.equal(cssResponse.status, 200);
+    assert.match(cssResponse.headers.get("content-type"), /text\/css/);
+  });
+});
