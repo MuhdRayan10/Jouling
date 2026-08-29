@@ -5,7 +5,7 @@ import { createJoulingServer } from "../server/app.mjs";
 import { JoulingStore } from "../server/store.mjs";
 import { PhotoVerifier } from "../server/verifier.mjs";
 import { calculateAvoidedKwh, territoryProgress } from "../server/logic.mjs";
-import { buildJoulingQrPayload, parseJoulingQrPayload } from "../public/qr-protocol.js";
+import { buildJoulingQrLink, buildJoulingQrPayload, parseJoulingQrPayload } from "../public/qr-protocol.js";
 
 const TEST_IMAGE = `data:image/png;base64,${Buffer.alloc(2048, 1).toString("base64")}`;
 
@@ -228,16 +228,36 @@ test("unclear proof returns actionable feedback and keeps the attempt open", asy
 
 test("Jouling QR generator and scanner share the v1 payload schema", () => {
   const payload = buildJoulingQrPayload({
-    origin: "https://jouling.example",
     missionId: "mission-library-ac",
     token: "signed-token"
   });
+  assert.deepEqual(JSON.parse(payload), {
+    protocol: "jouling.mission",
+    v: 1,
+    mission: "mission-library-ac",
+    token: "signed-token"
+  });
+  assert.doesNotMatch(payload, /localhost|https?:\/\//);
   const parsed = parseJoulingQrPayload(payload);
   assert.equal(parsed.protocol, "jouling.mission");
   assert.equal(parsed.version, "1");
   assert.equal(parsed.missionId, "mission-library-ac");
   assert.equal(parsed.token, "signed-token");
+
+  const deployedLink = buildJoulingQrLink({
+    origin: "https://jouling.example",
+    missionId: "mission-library-ac",
+    token: "signed-token"
+  });
+  assert.match(deployedLink, /^https:\/\/jouling\.example\//);
+  assert.equal(parseJoulingQrPayload(deployedLink).missionId, "mission-library-ac");
   assert.equal(parseJoulingQrPayload("jouling://mission/mission-library-ac?v=1&token=signed-token").missionId, "mission-library-ac");
+});
+
+test("Jouling QR parsing rejects mismatched JSON protocols and versions", () => {
+  assert.throws(() => parseJoulingQrPayload('{"protocol":"other.app","v":1,"mission":"mission-library-ac","token":"x"}'), /unsupported Jouling protocol/i);
+  assert.throws(() => parseJoulingQrPayload('{"protocol":"jouling.mission","v":2,"mission":"mission-library-ac","token":"x"}'), /unsupported protocol version 2/i);
+  assert.throws(() => buildJoulingQrLink({ origin: "jouling://app", missionId: "mission-library-ac", token: "x" }), /http or https/i);
 });
 
 test("energy and territory calculations are deterministic", () => {

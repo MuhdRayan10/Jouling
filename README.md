@@ -74,16 +74,24 @@ The standalone generator imports the same protocol module as the browser client,
 ```bash
 npm run qr -- --list
 npm run qr -- --mission mission-library-ac
-npm run qr -- --all --origin https://jouling.example
+npm run qr -- --all
 ```
 
-The canonical QR payload is a web link carrying `protocol=jouling.mission`, `v=1`, `mission`, and `token`. Example:
+The default QR payload is domain-independent JSON carrying `protocol`, `v`, `mission`, and `token`. It is read by Jouling's in-app scanner and works unchanged on localhost, a Vercel preview, or the production deployment:
 
-```text
-http://localhost:4173/?protocol=jouling.mission&v=1&mission=mission-library-ac&token=qr_library_ac_2026
+```json
+{"protocol":"jouling.mission","v":1,"mission":"mission-library-ac","token":"qr_library_ac_2026"}
 ```
 
-Generated SVG or PNG files are written to `generated-qr/` by default. Camera QR detection uses the browser's `BarcodeDetector` API where available. Camera access requires HTTPS or localhost. The participant must scan the physical label or open its QR link; manual mission-code entry is intentionally unavailable. `jouling://mission/...` and legacy GhostGrid QR links remain compatible.
+If a label must also open Jouling from the phone's native camera, generate an explicit web-link payload using the final Vercel production domain:
+
+```bash
+npm run qr -- --all --payload link --origin https://your-project.vercel.app
+```
+
+`--origin` can also come from `JOULING_APP_ORIGIN`. Link mode intentionally has no localhost default, preventing deployment-only failures. A link QR is tied to that domain; the default JSON QR is portable but must be scanned inside Jouling.
+
+Generated SVG or PNG files are written to `generated-qr/` by default. Camera QR detection uses the browser's `BarcodeDetector` API where available. Camera access requires HTTPS or localhost. Manual mission-code entry is intentionally unavailable. The scanner continues to accept deployed web links, `jouling://mission/...`, and legacy GhostGrid payloads, so previously printed non-local codes remain compatible. Regenerate any labels that contain `localhost`.
 
 ## Architecture
 

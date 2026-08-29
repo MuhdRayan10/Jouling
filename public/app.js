@@ -617,7 +617,7 @@ async function startScanner() {
     return showToast("Camera scanning needs HTTPS or localhost. Open Jouling on your phone at the mission spot.", "!");
   }
   if (!("BarcodeDetector" in window)) {
-    return showToast("This browser lacks QR detection. Use your phone camera to open the Jouling label.", "!");
+    return showToast("This browser lacks built-in QR detection. Open Jouling in Chrome or Edge on your phone.", "!");
   }
   try {
     scannerStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });

@@ -2,11 +2,11 @@
 import { mkdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import QRCode from "qrcode";
-import { buildJoulingQrPayload, JOULING_QR_PROTOCOL, JOULING_QR_VERSION } from "../public/qr-protocol.js";
+import { buildJoulingQrLink, buildJoulingQrPayload, JOULING_QR_PROTOCOL, JOULING_QR_VERSION } from "../public/qr-protocol.js";
 import { createSeedState } from "../server/seed.mjs";
 
 function readArgs(argv) {
-  const values = { origin: process.env.JOULING_APP_ORIGIN || "http://localhost:4173", format: "svg" };
+  const values = { origin: process.env.JOULING_APP_ORIGIN, format: "svg", payload: "json" };
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
     if (argument === "--all" || argument === "--list" || argument === "--help") values[argument.slice(2)] = true;
@@ -20,13 +20,15 @@ function printHelp() {
 
 Usage:
   npm run qr -- --mission mission-library-ac
-  npm run qr -- --all --origin https://jouling.example
+  npm run qr -- --all
+  npm run qr -- --all --payload link --origin https://jouling.example
   npm run qr -- --mission mission-library-ac --output labels/library-ac.png --format png
 
 Options:
   --mission <id|code>  Mission ID or short code from the seed configuration
   --all                Generate one QR for every configured mission
-  --origin <url>       Public Jouling app origin (default: http://localhost:4173)
+  --payload <json|link> Domain-independent JSON (default) or an app deep link
+  --origin <url>       Required only for link payloads; may use JOULING_APP_ORIGIN
   --output <path>      Output path for a single mission
   --format <svg|png>   QR image format (default: svg)
   --list               List available mission IDs and codes
@@ -39,12 +41,16 @@ function safeFileName(mission) {
 
 async function generate(mission, options, multiple) {
   const format = String(options.format || "svg").toLowerCase();
+  const payloadType = String(options.payload || "json").toLowerCase();
   if (!new Set(["svg", "png"]).has(format)) throw new Error("--format must be svg or png");
-  const payload = buildJoulingQrPayload({
-    origin: options.origin,
-    missionId: mission.id,
-    token: mission.qrToken
-  });
+  if (!new Set(["json", "link"]).has(payloadType)) throw new Error("--payload must be json or link");
+  if (payloadType === "link" && !options.origin) {
+    throw new Error("Link payloads require --origin https://your-jouling-domain or JOULING_APP_ORIGIN");
+  }
+  const missionData = { missionId: mission.id, token: mission.qrToken };
+  const payload = payloadType === "link"
+    ? buildJoulingQrLink({ origin: options.origin, ...missionData })
+    : buildJoulingQrPayload(missionData);
   const output = resolve(options.output && !multiple
     ? options.output
     : `generated-qr/${safeFileName(mission)}.${format}`);
@@ -56,7 +62,7 @@ async function generate(mission, options, multiple) {
     width: format === "png" ? 900 : undefined,
     color: { dark: "#173728", light: "#FFFFFF" }
   });
-  console.log(`Generated ${mission.code} → ${output} (${JOULING_QR_PROTOCOL} v${JOULING_QR_VERSION})`);
+  console.log(`Generated ${mission.code} → ${output} (${JOULING_QR_PROTOCOL} v${JOULING_QR_VERSION}, ${payloadType})`);
 }
 
 const options = readArgs(process.argv.slice(2));

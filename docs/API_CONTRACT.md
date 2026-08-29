@@ -56,13 +56,13 @@ Creates a team, generates an invite code, and moves the participant into it.
 }
 ```
 
-The backend checks the QR token, active window and location cooldown, then creates a ten-minute attempt. The canonical v1 QR schema is:
+The backend checks the QR token, active window and location cooldown, then creates a ten-minute attempt. The canonical, domain-independent v1 QR schema is:
 
-```text
-https://host/?protocol=jouling.mission&v=1&mission=mission-library-ac&token=qr_library_ac_2026
+```json
+{"protocol":"jouling.mission","v":1,"mission":"mission-library-ac","token":"qr_library_ac_2026"}
 ```
 
-The shared `public/qr-protocol.js` module builds and parses this exact schema for both the app and `scripts/generate-qr.mjs`. The scanner also accepts `jouling://mission/...` and legacy GhostGrid payloads.
+The shared `public/qr-protocol.js` module builds and parses this exact schema for both the app and `scripts/generate-qr.mjs`. The generator's optional `--payload link --origin https://host` mode wraps the same fields in a deployed web link for native-camera deep linking. The scanner accepts both forms, plus `jouling://mission/...` and legacy GhostGrid payloads.
 
 ### `POST /api/attempts/{attemptId}/verify`
 
