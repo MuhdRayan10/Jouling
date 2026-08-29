@@ -4,3 +4,4 @@ node_modules/
 .DS_Store
 data/runtime-state.json
 generated-qr/
+public/vendor/
