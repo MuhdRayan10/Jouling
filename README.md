@@ -62,9 +62,9 @@ Generated SVG or PNG files are written to `generated-qr/` by default. Camera QR 
 ## Architecture
 
 - `public/`: responsive web UI, campus map, QR scanner, camera proof flow, shared QR protocol, team league and impact screens.
-- `server/`: dependency-free Node HTTP server, in-memory MVP state, game rules and OpenAI photo verifier.
+- `server/`: dependency-free Node HTTP server, in-memory session state, game rules and OpenAI photo verifier.
 - `scripts/generate-qr.mjs`: standalone SVG/PNG label generator using the shared Jouling QR v1 schema.
 - `docs/API_CONTRACT.md`: frontend/backend contract and competition semantics.
 - `tests/`: end-to-end API, QR, verification, cooldown, territory and OpenAI request-contract tests.
 
-Production upgrades would add real authentication, persistent storage, signed/rotating QR tokens, EcoVolt telemetry ingestion, anomaly IDs, object-storage retention policies, admin RBAC and institution-specific schedules.
+The MVP intentionally keeps state only for the lifetime of the Node process. Every verified task immediately updates the participant, team, impact, territory, reward, leaderboard, daily-match and activity views; restarting the server resets the demo. Production upgrades would add real authentication, persistent storage, signed/rotating QR tokens, EcoVolt telemetry ingestion, anomaly IDs, object-storage retention policies, admin RBAC and institution-specific schedules.

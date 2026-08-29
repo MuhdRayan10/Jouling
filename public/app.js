@@ -22,6 +22,8 @@ let scannerStream = null;
 let scannerTimer = null;
 let toastTimer = null;
 let resultRetryAllowed = false;
+let matchCountdownTimer = null;
+let lastImpactTrigger = null;
 
 const userId = () => localStorage.getItem("jouling.userId") || localStorage.getItem("ghostgrid.userId") || "u-demo";
 
@@ -76,10 +78,19 @@ function showToast(message, icon = "✓") {
 
 function navigate(view) {
   stopScanner();
+  closeImpactDetail(false);
   $$(".app-view").forEach((element) => element.classList.toggle("active", element.dataset.view === view));
   $$(".bottom-nav button").forEach((button) => button.classList.toggle("active", button.dataset.nav === view));
   window.scrollTo({ top: 0, behavior: "smooth" });
   if (view === "scan") setTimeout(() => $("#startScannerButton").focus(), 250);
+}
+
+function formatCountdown(endsAt) {
+  const milliseconds = Math.max(0, new Date(endsAt).getTime() - Date.now());
+  const hours = Math.floor(milliseconds / 3_600_000);
+  const minutes = Math.floor((milliseconds % 3_600_000) / 60_000);
+  if (milliseconds === 0) return "Match complete";
+  return `${hours}h ${String(minutes).padStart(2, "0")}m left`;
 }
 
 function openSheet(sheet) {
@@ -228,8 +239,10 @@ function renderTeams() {
   $("#heroTeamTerritories").textContent = territories.filter((territory) => territory.ownerTeamId === team.id).length;
   $("#heroTeamCredits").textContent = `$${Number(team.rewardCredits).toFixed(2)}`;
 
+  renderDailyMatch();
+
   $("#leaderboard").innerHTML = teams.map((item) => `
-    <article class="team-row ${item.id === team.id ? "current" : ""}">
+    <article class="team-row rank-${item.rank} ${item.id === team.id ? "current" : ""}">
       <div class="rank-number">${item.rank}</div>
       <div class="row-crest" style="background:${item.color}">${escapeHtml(item.emblem)}</div>
       <div class="team-row-copy"><strong>${escapeHtml(item.name)}${item.id === team.id ? " • You" : ""}</strong><span>${item.memberCount} members • ${formatNumber(item.kwhSaved, 1)} kWh</span></div>
@@ -242,12 +255,39 @@ function renderTeams() {
   }).join("");
 }
 
+function renderDailyMatch() {
+  const matchup = appState.dailyMatchup;
+  const card = $("#dailyMatchCard");
+  if (!matchup) {
+    card.hidden = true;
+    $("#dailyMatchTimer").textContent = "Pairing soon";
+    return;
+  }
+  card.hidden = false;
+  const { teamA, teamB } = matchup;
+  $("#matchTeamACrest").textContent = teamA.emblem;
+  $("#matchTeamACrest").style.background = teamA.color;
+  $("#matchTeamAName").textContent = teamA.name;
+  $("#matchTeamAScore").textContent = `${formatNumber(matchup.teamAScore, 0)} XP`;
+  $("#matchTeamBCrest").textContent = teamB.emblem;
+  $("#matchTeamBCrest").style.background = teamB.color;
+  $("#matchTeamBName").textContent = teamB.name;
+  $("#matchTeamBScore").textContent = `${formatNumber(matchup.teamBScore, 0)} XP`;
+  $("#dailyMatchReward").textContent = `Winning team earns a ${formatNumber(matchup.rewardXp, 0)} XP boost`;
+  const scoreTotal = Math.max(1, matchup.teamAScore + matchup.teamBScore);
+  $("#dailyMatchProgress").style.width = `${Math.round((matchup.teamAScore / scoreTotal) * 100)}%`;
+  const updateTimer = () => { $("#dailyMatchTimer").textContent = formatCountdown(matchup.endsAt); };
+  clearInterval(matchCountdownTimer);
+  updateTimer();
+  matchCountdownTimer = setInterval(updateTimer, 60_000);
+}
+
 function renderImpact() {
   const team = appState.team;
   const dailyReferenceFraction = ((team.kwhSaved / Math.max(1, team.memberCount)) * 8_200_000_000) / 82_000_000_000;
   $("#planetReliefValue").textContent = `${(dailyReferenceFraction * 100).toFixed(2)}%`;
   $("#impactKwh").textContent = formatNumber(team.kwhSaved, 2);
-  $("#impactMinutes").textContent = formatNumber(Math.round(team.kwhSaved * 61.3), 0);
+  $("#impactMinutes").textContent = formatNumber(team.wasteMinutesStopped ?? Math.round(team.kwhSaved * 61.3), 0);
   const conqueredSqFt = appState.territories
     .filter((territory) => territory.ownerTeamId === team.id)
     .reduce((total, territory) => total + Number(territory.areaSqFt || 0), 0);
@@ -255,6 +295,86 @@ function renderImpact() {
   $("#impactBaseline").textContent = `${Math.min(48, Math.max(9, Math.round(team.kwhSaved * 1.3)))}%`;
   $("#walletBalance").textContent = `$${Number(team.rewardCredits).toFixed(2)}`;
   $("#rewardProgress").style.width = `${Math.min(100, (team.rewardCredits / 20) * 100)}%`;
+}
+
+function impactSummary() {
+  const team = appState.team;
+  const totalMinutes = team.wasteMinutesStopped ?? Math.round(team.kwhSaved * 61.3);
+  const conquered = appState.territories.filter((territory) => territory.ownerTeamId === team.id);
+  const conqueredSqFt = conquered.reduce((total, territory) => total + Number(territory.areaSqFt || 0), 0);
+  const baselinePercent = Math.min(48, Math.max(9, Math.round(team.kwhSaved * 1.3)));
+  const completedMissions = appState.missions.filter((mission) => mission.completedForTeam);
+  return { team, totalMinutes, conquered, conqueredSqFt, baselinePercent, completedMissions };
+}
+
+function detailStatGrid(items) {
+  return `<div class="detail-stat-grid">${items.map(([value, label]) => `<div><strong>${escapeHtml(value)}</strong><span>${escapeHtml(label)}</span></div>`).join("")}</div>`;
+}
+
+function detailBars(items) {
+  const max = Math.max(1, ...items.map((item) => item.value));
+  return `<div class="detail-bars">${items.map((item) => `
+    <div><div class="detail-bar-label"><span>${escapeHtml(item.label)}</span><b>${escapeHtml(item.display)}</b></div><div class="detail-bar-track"><i style="width:${Math.max(8, Math.round((item.value / max) * 100))}%"></i></div></div>`).join("")}</div>`;
+}
+
+function openImpactDetail(type, trigger = null) {
+  if (!appState) return;
+  const { team, totalMinutes, conquered, conqueredSqFt, baselinePercent, completedMissions } = impactSummary();
+  const memberCount = Math.max(1, team.memberCount);
+  const visibleMissions = completedMissions.length ? completedMissions : appState.missions;
+  const energyByType = Object.values(visibleMissions.reduce((groups, mission) => {
+    const key = mission.type || "other";
+    groups[key] ||= { label: key[0].toUpperCase() + key.slice(1), value: 0 };
+    groups[key].value += Number(mission.estimatedKwh || 0);
+    return groups;
+  }, {})).map((item) => ({ ...item, display: `${formatNumber(item.value, 3)} kWh` }));
+  const portfolioArea = appState.territories.reduce((sum, territory) => sum + Number(territory.areaSqFt || 0), 0);
+  const baselineTarget = team.kwhSaved / (1 + baselinePercent / 100);
+  const details = {
+    kwh: {
+      accent: "linear-gradient(145deg,#2d8c00,#58cc02)", eyebrow: "VERIFIED ENERGY", title: "Every saved kilowatt-hour",
+      intro: "Only AI-verified, approved missions feed this total—so the team can trust what moved the number.", icon: "ϟ", value: `${formatNumber(team.kwhSaved, 2)} kWh`, label: "team total",
+      body: `${detailStatGrid([[`${formatNumber(team.kwhSaved / memberCount, 2)} kWh`, "per team member"], [String(appState.user.weeklyMissions), "your missions this week"], [formatNumber(team.score, 0), "team XP"], [String(completedMissions.length), "visible verified nodes"]])}<section class="detail-card"><h3>Visible mission mix</h3>${detailBars(energyByType)}</section>`
+    },
+    minutes: {
+      accent: "linear-gradient(145deg,#087db4,#1cb0f6)", eyebrow: "WASTE INTERRUPTED", title: "Time that power stopped leaking",
+      intro: "Waste-minutes translate avoided electricity into a clock: how long unnecessary devices would otherwise have kept running.", icon: "◷", value: `${formatNumber(totalMinutes, 0)} min`, label: "waste-minutes stopped",
+      body: `${detailStatGrid([[`${formatNumber(totalMinutes / 60, 1)} h`, "combined waste time"], [`${formatNumber(totalMinutes / memberCount, 0)} min`, "per team member"], [`${formatNumber(totalMinutes / Math.max(1, appState.user.weeklyMissions), 0)} min`, "per weekly mission"], [`${formatNumber(team.kwhSaved, 2)} kWh`, "verified source total"]])}<section class="detail-card"><h3>What this metric means</h3><p>For each completed mission, Jouling combines the approved device’s avoidable load with its prevented run-time. The result remains anchored to verified kWh while making the avoided duration easier to feel.</p></section>`
+    },
+    area: {
+      accent: "linear-gradient(145deg,#087db4,#5950d8)", eyebrow: "TEAM TERRITORY", title: "Space your team has conquered",
+      intro: "A zone counts only while your team owns every required mission node. Rival teams can take it back by completing the same approved network.", icon: "⌖", value: `${formatNumber(conqueredSqFt, 0)} sq ft`, label: "currently controlled",
+      body: `${detailStatGrid([[String(conquered.length), "zones controlled"], [`${portfolioArea ? Math.round((conqueredSqFt / portfolioArea) * 100) : 0}%`, "mapped campus share"], [String(appState.territories.length), "zones in play"], [`${formatNumber(portfolioArea, 0)} sq ft`, "mapped portfolio"]])}<section class="detail-card"><h3>Controlled zones</h3>${conquered.length ? conquered.map((territory) => `<div class="detail-zone"><span>⌖</span><div><strong>${escapeHtml(territory.name)}</strong><small>${territory.progress.completed} of ${territory.progress.required} nodes verified</small></div><b>${formatNumber(territory.areaSqFt, 0)} sq ft</b></div>`).join("") : "<p>Complete every node in a territory to put its area on the board.</p>"}</section>`
+    },
+    baseline: {
+      accent: "linear-gradient(145deg,#8e45b8,#ce82ff)", eyebrow: "PACE VS BASELINE", title: "Ahead of the expected saving pace",
+      intro: "This compares the team’s verified energy-saving pace with the institution’s reference target for the same period.", icon: "▲", value: `${baselinePercent}%`, label: "better than baseline",
+      body: `${detailStatGrid([[`${formatNumber(baselineTarget, 2)} kWh`, "reference target"], [`+${formatNumber(team.kwhSaved - baselineTarget, 2)} kWh`, "above target"], [`${formatNumber(team.kwhSaved, 2)} kWh`, "verified pace"], [String(team.streak), "day team streak"]])}<section class="detail-card"><h3>Why it matters</h3><p>The comparison is anchored to an institutional target, while mission photos and cooldowns protect the verified total from duplicate or unsupported claims.</p></section>`
+    }
+  };
+  const detail = details[type];
+  if (!detail) return;
+  lastImpactTrigger = trigger || document.activeElement;
+  $("#impactDetailEyebrow").textContent = detail.eyebrow;
+  $("#impactDetailTitle").textContent = detail.title;
+  $("#impactDetailIntro").textContent = detail.intro;
+  $(".impact-detail-header").style.background = detail.accent;
+  $("#impactDetailContent").innerHTML = `<section class="detail-hero-stat"><div><span>${escapeHtml(detail.label)}</span><strong>${escapeHtml(detail.value)}</strong></div><div class="detail-hero-icon">${escapeHtml(detail.icon)}</div></section>${detail.body}`;
+  const overlay = $("#impactDetailOverlay");
+  overlay.classList.add("show");
+  overlay.setAttribute("aria-hidden", "false");
+  document.body.style.overflow = "hidden";
+  $("#impactDetailClose").focus();
+}
+
+function closeImpactDetail(restoreFocus = true) {
+  const overlay = $("#impactDetailOverlay");
+  if (!overlay) return;
+  const wasOpen = overlay.classList.contains("show");
+  overlay.classList.remove("show");
+  overlay.setAttribute("aria-hidden", "true");
+  if (wasOpen) document.body.style.overflow = "";
+  if (wasOpen && restoreFocus && lastImpactTrigger?.focus) lastImpactTrigger.focus();
 }
 
 function renderAll() {
@@ -578,6 +698,7 @@ function bindEvents() {
     if (event.key === "Escape") {
       closeSheets();
       $("#resultOverlay").classList.remove("show");
+      closeImpactDetail();
     }
   });
   $$(".filter-pill").forEach((button) => button.addEventListener("click", () => {
@@ -625,6 +746,11 @@ function bindEvents() {
   $("#joinTeamForm").addEventListener("submit", joinTeam);
   $("#createTeamForm").addEventListener("submit", createTeam);
   $("#shareTeamButton").addEventListener("click", shareTeam);
+  $$('[data-impact-detail]').forEach((button) => button.addEventListener("click", () => openImpactDetail(button.dataset.impactDetail, button)));
+  $("#impactDetailClose").addEventListener("click", () => closeImpactDetail());
+  $("#impactDetailOverlay").addEventListener("click", (event) => {
+    if (event.target === $("#impactDetailOverlay")) closeImpactDetail();
+  });
 }
 
 bindEvents();

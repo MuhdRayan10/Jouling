@@ -19,7 +19,7 @@
         </button>
         <div class="top-stats" aria-label="Player progress">
           <button class="stat-chip streak-chip" data-nav="impact" aria-label="Current streak">
-            <span aria-hidden="true">◆</span><b id="streakValue">4</b>
+            <span class="fire-icon" aria-hidden="true"><svg viewBox="0 0 24 28"><path d="M13.8 1.5c.8 4-1.7 5.7-3.5 8.1-1.1-1.8-1.2-3.4-.5-5.1C5.7 7.1 3 10.8 3 15.3 3 21.6 7 26 12 26s9-4.4 9-10.7c0-5.4-3.1-9.9-7.2-13.8Zm-1.6 20.2c-2.3 0-4.1-1.8-4.1-4.4 0-2 1.1-3.7 2.8-5.2-.1 2 .8 3 1.7 4.1 1.1-1.2 1.6-2.5 1.3-4.3 1.6 1.4 2.5 3.2 2.5 5.3 0 2.6-1.9 4.5-4.2 4.5Z"/></svg></span><b id="streakValue">4</b>
           </button>
           <button class="stat-chip xp-chip" data-nav="impact" aria-label="Experience points">
             <span aria-hidden="true">ϟ</span><b id="xpValue">860</b>
@@ -159,6 +159,28 @@
             </div>
           </div>
 
+          <section class="section-block daily-match-block" aria-labelledby="dailyMatchHeading">
+            <div class="section-heading">
+              <div><p class="eyebrow daily-label">TODAY'S MATCH</p><h2 id="dailyMatchHeading">Team head-to-head</h2></div>
+              <span class="daily-timer" id="dailyMatchTimer">Ends tonight</span>
+            </div>
+            <div class="daily-match-card" id="dailyMatchCard">
+              <div class="match-team match-team-a">
+                <span class="match-crest" id="matchTeamACrest">ϟ</span>
+                <strong id="matchTeamAName">Green Circuit</strong>
+                <b id="matchTeamAScore">460 XP</b>
+              </div>
+              <div class="versus-orb" aria-label="versus">VS</div>
+              <div class="match-team match-team-b">
+                <span class="match-crest" id="matchTeamBCrest">◉</span>
+                <strong id="matchTeamBName">Watt Watchers</strong>
+                <b id="matchTeamBScore">405 XP</b>
+              </div>
+              <div class="match-score-track" aria-hidden="true"><i id="dailyMatchProgress"></i></div>
+              <p class="match-reward" id="dailyMatchReward">Winning team earns a 180 XP boost</p>
+            </div>
+          </section>
+
           <section class="section-block leaderboard-block">
             <div class="section-heading"><div><p class="eyebrow">WEEKLY</p><h2>Leaderboard</h2></div><span class="season-pill">2d 14h left</span></div>
             <div class="leaderboard" id="leaderboard"></div>
@@ -181,10 +203,10 @@
             <div class="planet-copy"><span>PLANET RELIEF</span><strong id="planetReliefValue">0.19%</strong><p id="planetReliefText">If everyone matched your team's rate, this is the share of a global electricity day avoided.</p></div>
           </div>
           <div class="impact-grid">
-            <article><span class="impact-icon green">ϟ</span><strong id="impactKwh">18.6</strong><p>verified kWh saved</p></article>
-            <article><span class="impact-icon blue">◷</span><strong id="impactMinutes">1,140</strong><p>waste-minutes stopped</p></article>
-            <article><span class="impact-icon territory">⌖</span><strong id="impactAreas">0 sq ft</strong><p>area conquered</p></article>
-            <article><span class="impact-icon purple">▲</span><strong id="impactBaseline">24%</strong><p>better than baseline</p></article>
+            <button class="impact-metric-card" type="button" data-impact-detail="kwh" aria-label="Open detailed verified energy statistics"><span class="impact-icon green">ϟ</span><strong id="impactKwh">18.6</strong><p>verified kWh saved</p><i class="metric-arrow" aria-hidden="true">›</i></button>
+            <button class="impact-metric-card" type="button" data-impact-detail="minutes" aria-label="Open detailed waste-minutes statistics"><span class="impact-icon blue">◷</span><strong id="impactMinutes">1,140</strong><p>waste-minutes stopped</p><i class="metric-arrow" aria-hidden="true">›</i></button>
+            <button class="impact-metric-card" type="button" data-impact-detail="area" aria-label="Open detailed conquered-area statistics"><span class="impact-icon territory">⌖</span><strong id="impactAreas">0 sq ft</strong><p>area conquered</p><i class="metric-arrow" aria-hidden="true">›</i></button>
+            <button class="impact-metric-card" type="button" data-impact-detail="baseline" aria-label="Open detailed baseline comparison statistics"><span class="impact-icon purple">▲</span><strong id="impactBaseline">24%</strong><p>better than baseline</p><i class="metric-arrow" aria-hidden="true">›</i></button>
           </div>
           <section class="reward-card">
             <div class="reward-card-top"><div><p class="eyebrow">REAL-WORLD REWARD</p><h2>Team canteen wallet</h2></div><span class="wallet-icon">▰</span></div>
@@ -282,6 +304,18 @@
           <div><span>$</span><strong id="resultCredit">1.25</strong><small>credit</small></div>
         </div>
         <button class="primary-button" id="resultContinueButton">See the map</button>
+      </div>
+    </div>
+
+    <div class="impact-detail-overlay" id="impactDetailOverlay" role="dialog" aria-modal="true" aria-labelledby="impactDetailTitle" aria-hidden="true">
+      <div class="impact-detail-shell">
+        <header class="impact-detail-header">
+          <button class="impact-detail-close" id="impactDetailClose" type="button" aria-label="Close detailed statistics">×</button>
+          <p class="eyebrow" id="impactDetailEyebrow">IMPACT BREAKDOWN</p>
+          <h2 id="impactDetailTitle">Verified energy saved</h2>
+          <p id="impactDetailIntro"></p>
+        </header>
+        <div class="impact-detail-content" id="impactDetailContent"></div>
       </div>
     </div>
 

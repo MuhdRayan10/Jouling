@@ -16,6 +16,7 @@ function clone(value) {
 export class JoulingStore {
   constructor(initialState = createSeedState()) {
     this.state = clone(initialState);
+    this.persistenceMode = "memory";
   }
 
   findUser(userId = "u-demo") {
@@ -48,6 +49,7 @@ export class JoulingStore {
       user: clone(user),
       team: clone(team),
       teams: this.leaderboard(),
+      dailyMatchup: this.dailyMatchupFor(team.id),
       missions: this.state.missions.map((mission) => publicMission(clone(mission), team.id, now)),
       territories: clone(territories),
       activity: clone(this.state.activity.slice(0, 8)),
@@ -60,6 +62,23 @@ export class JoulingStore {
     return clone([...this.state.teams]
       .sort((a, b) => b.score - a.score)
       .map((team, index) => ({ ...team, rank: index + 1 })));
+  }
+
+  dailyMatchupFor(teamId) {
+    const matchup = this.state.dailyMatchups?.find((item) => item.teamAId === teamId || item.teamBId === teamId);
+    if (!matchup) return null;
+    return clone({
+      ...matchup,
+      teamA: this.findTeam(matchup.teamAId),
+      teamB: this.findTeam(matchup.teamBId)
+    });
+  }
+
+  addDailyScore(teamId, points) {
+    const matchup = this.state.dailyMatchups?.find((item) => item.teamAId === teamId || item.teamBId === teamId);
+    if (!matchup) return;
+    if (matchup.teamAId === teamId) matchup.teamAScore += points;
+    else matchup.teamBScore += points;
   }
 
   createSession({ name, teamCode }) {
@@ -118,11 +137,31 @@ export class JoulingStore {
       emblem: "⚡",
       score: 0,
       kwhSaved: 0,
+      wasteMinutesStopped: 0,
       rewardCredits: 0,
       memberCount: 0,
       streak: 1
     };
     this.state.teams.push(team);
+    const opponent = [...this.state.teams]
+      .filter((item) => item.id !== team.id)
+      .sort((a, b) => a.score - b.score)[0];
+    if (opponent) {
+      const today = new Date();
+      const startsAt = new Date(today.setHours(0, 0, 0, 0)).toISOString();
+      const endsAt = new Date(today.setHours(24, 0, 0, 0)).toISOString();
+      this.state.dailyMatchups ||= [];
+      this.state.dailyMatchups.push({
+        id: `daily-${team.id}-${opponent.id}`,
+        teamAId: team.id,
+        teamBId: opponent.id,
+        teamAScore: 0,
+        teamBScore: Math.max(120, Math.round(opponent.score * 0.14)),
+        startsAt,
+        endsAt,
+        rewardXp: 180
+      });
+    }
     return this.joinTeam({ userId: user.id, teamId: team.id });
   }
 
@@ -191,12 +230,18 @@ export class JoulingStore {
     user.xp += mission.xp;
     user.weeklyMissions += 1;
     user.level = Math.max(1, Math.floor(user.xp / 180) + 1);
+    const currentWasteMinutes = Number.isFinite(team.wasteMinutesStopped)
+      ? team.wasteMinutesStopped
+      : Math.round(team.kwhSaved * 61.3);
     team.score += mission.xp;
+    this.addDailyScore(team.id, mission.xp);
     team.kwhSaved = Number((team.kwhSaved + kwhSaved).toFixed(3));
+    team.wasteMinutesStopped = currentWasteMinutes + mission.avoidedMinutes;
     team.rewardCredits = Number((team.rewardCredits + mission.credit).toFixed(2));
     const captures = recalculateTerritories(this.state, team.id);
     for (const capture of captures) {
       team.score += 250;
+      this.addDailyScore(team.id, 250);
       this.state.activity.unshift({
         id: `activity-${randomUUID()}`,
         teamId: team.id,

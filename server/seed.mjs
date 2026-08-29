@@ -27,6 +27,7 @@ export function createSeedState() {
         emblem: "⚡",
         score: 2840,
         kwhSaved: 18.6,
+        wasteMinutesStopped: 1140,
         rewardCredits: 12.4,
         memberCount: 8,
         streak: 6
@@ -41,6 +42,7 @@ export function createSeedState() {
         emblem: "☀",
         score: 3110,
         kwhSaved: 20.8,
+        wasteMinutesStopped: 1275,
         rewardCredits: 14.15,
         memberCount: 10,
         streak: 8
@@ -55,6 +57,7 @@ export function createSeedState() {
         emblem: "◉",
         score: 2475,
         kwhSaved: 16.1,
+        wasteMinutesStopped: 987,
         rewardCredits: 10.8,
         memberCount: 7,
         streak: 5
@@ -69,6 +72,7 @@ export function createSeedState() {
         emblem: "✦",
         score: 1980,
         kwhSaved: 12.7,
+        wasteMinutesStopped: 779,
         rewardCredits: 8.3,
         memberCount: 6,
         streak: 3
@@ -267,6 +271,28 @@ export function createSeedState() {
         strength: 78,
         capturedAt: recent(64),
         teamProgress: {}
+      }
+    ],
+    dailyMatchups: [
+      {
+        id: "daily-green-blue",
+        teamAId: "team-green",
+        teamBId: "team-blue",
+        teamAScore: 460,
+        teamBScore: 405,
+        startsAt: new Date(new Date(now).setHours(0, 0, 0, 0)).toISOString(),
+        endsAt: new Date(new Date(now).setHours(24, 0, 0, 0)).toISOString(),
+        rewardXp: 180
+      },
+      {
+        id: "daily-gold-purple",
+        teamAId: "team-gold",
+        teamBId: "team-purple",
+        teamAScore: 510,
+        teamBScore: 438,
+        startsAt: new Date(new Date(now).setHours(0, 0, 0, 0)).toISOString(),
+        endsAt: new Date(new Date(now).setHours(24, 0, 0, 0)).toISOString(),
+        rewardXp: 180
       }
     ],
     attempts: [],

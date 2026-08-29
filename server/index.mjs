@@ -13,7 +13,7 @@ const server = createJoulingServer();
 
 server.listen(port, "0.0.0.0", () => {
   const verifierMode = process.env.OPENAI_API_KEY ? "OpenAI vision" : "demo verifier";
-  console.log(`Jouling is running at http://localhost:${port} (${verifierMode})`);
+  console.log(`Jouling is running at http://localhost:${port} (${verifierMode}, in-memory session)`);
 });
 
 function shutdown() {

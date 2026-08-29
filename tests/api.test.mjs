@@ -41,6 +41,9 @@ test("bootstrap returns the map, current team, and competition state", async () 
     assert.equal(payload.territories.length, 2);
     assert.equal(payload.territories[0].areaSqFt, 18500);
     assert.equal(payload.territories[0].progress.completed, 2);
+    assert.equal(payload.dailyMatchup.teamA.id, "team-green");
+    assert.equal(payload.dailyMatchup.teamB.id, "team-blue");
+    assert.equal(payload.dailyMatchup.rewardXp, 180);
     assert.equal(payload.missions[0].qrToken, undefined, "QR secrets must not be exposed in bootstrap state");
   });
 });
@@ -70,6 +73,8 @@ test("creating a team makes its creator a competing member", async () => {
     assert.equal(payload.teams.find((team) => team.id === payload.team.id).rank, 5);
     assert.equal(payload.user.teamId, payload.team.id);
     assert.match(payload.team.code, /^[A-Z0-9]{6}$/);
+    assert.equal(payload.dailyMatchup.teamA.id, payload.team.id);
+    assert.equal(payload.dailyMatchup.rewardXp, 180);
   });
 });
 
@@ -100,11 +105,19 @@ test("verified proof awards impact and captures a three-node territory", async (
     assert.equal(verified.response.status, 200);
     assert.equal(verified.payload.accepted, true);
     assert.equal(verified.payload.impact.kwhSaved, 0.855);
+    assert.equal(verified.payload.impact.wasteMinutesStopped, 45);
     assert.equal(verified.payload.captures[0].territoryId, "territory-central");
     assert.equal(verified.payload.state.territories[0].ownerTeamId, "team-green");
     assert.equal(verified.payload.state.territories[0].areaSqFt, 18500);
     assert.equal(verified.payload.state.user.xp, 980);
+    assert.equal(verified.payload.state.user.weeklyMissions, 5);
     assert.equal(verified.payload.state.team.score, 3210, "mission XP plus capture bonus should be awarded");
+    assert.equal(verified.payload.state.team.kwhSaved, 19.455);
+    assert.equal(verified.payload.state.team.wasteMinutesStopped, 1185, "the exact avoided mission time should update the live team total");
+    assert.equal(verified.payload.state.team.rewardCredits, 13.65);
+    assert.equal(verified.payload.state.teams[0].id, "team-green", "the updated score should immediately reorder the leaderboard");
+    assert.match(verified.payload.state.activity[0].text, /captured Central Commons/);
+    assert.equal(verified.payload.state.dailyMatchup.teamAScore, 830, "daily match score should include mission and capture XP");
   });
 });
 

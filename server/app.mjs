@@ -83,6 +83,7 @@ export function createJoulingServer({ store = new JoulingStore(), verifier = new
       if (req.method === "GET" && url.pathname === "/api/health") {
         return sendJson(res, 200, {
           ok: true,
+          persistenceMode: store.persistenceMode || "memory",
           verifierMode: verifier.apiKey ? "openai" : (verifier.demoMode ? "demo" : "unavailable"),
           visionModel: verifier.apiKey ? verifier.model : null
         });
@@ -91,42 +92,42 @@ export function createJoulingServer({ store = new JoulingStore(), verifier = new
         return sendJson(res, 200, apiContract);
       }
       if (req.method === "GET" && url.pathname === "/api/state") {
-        return sendJson(res, 200, store.bootstrap(url.searchParams.get("userId") || "u-demo"));
+        return sendJson(res, 200, await store.bootstrap(url.searchParams.get("userId") || "u-demo"));
       }
       if (req.method === "GET" && url.pathname === "/api/leaderboard") {
-        return sendJson(res, 200, { teams: store.leaderboard() });
+        return sendJson(res, 200, { teams: await store.leaderboard() });
       }
       if (req.method === "POST" && url.pathname === "/api/session") {
         const body = await readJson(req);
-        return sendJson(res, 201, store.createSession(body));
+        return sendJson(res, 201, await store.createSession(body));
       }
       if (req.method === "POST" && url.pathname === "/api/teams/join") {
         const body = await readJson(req);
-        return sendJson(res, 200, store.joinTeam(body));
+        return sendJson(res, 200, await store.joinTeam(body));
       }
       if (req.method === "POST" && url.pathname === "/api/teams") {
         const body = await readJson(req);
-        return sendJson(res, 201, store.createTeam(body));
+        return sendJson(res, 201, await store.createTeam(body));
       }
 
       const scanMatch = url.pathname.match(/^\/api\/missions\/([^/]+)\/scan$/);
       if (req.method === "POST" && scanMatch) {
         const body = await readJson(req);
-        const result = store.scanMission({ ...body, missionId: decodeURIComponent(scanMatch[1]) });
+        const result = await store.scanMission({ ...body, missionId: decodeURIComponent(scanMatch[1]) });
         return sendJson(res, 201, result);
       }
 
       const verifyMatch = url.pathname.match(/^\/api\/attempts\/([^/]+)\/verify$/);
       if (req.method === "POST" && verifyMatch) {
         const body = await readJson(req);
-        const attempt = store.getAttempt(decodeURIComponent(verifyMatch[1]));
-        const mission = store.findMission(attempt.missionId);
+        const attempt = await store.getAttempt(decodeURIComponent(verifyMatch[1]));
+        const mission = await store.findMission(attempt.missionId);
         const verification = await verifier.verify({
           mission,
           imageDataUrl: body.imageDataUrl,
           userId: attempt.userId
         });
-        return sendJson(res, 200, store.completeAttempt(attempt.id, verification));
+        return sendJson(res, 200, await store.completeAttempt(attempt.id, verification));
       }
 
       if (url.pathname.startsWith("/api/")) {
