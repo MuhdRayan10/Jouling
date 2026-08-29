@@ -9,13 +9,13 @@
     <link rel="manifest" href="/manifest.webmanifest">
     <link rel="icon" href="/icon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="/vendor/maplibre-gl/maplibre-gl.css">
-    <link rel="stylesheet" href="/styles.css?v=maplibre-1">
+    <link rel="stylesheet" href="/styles.css?v=team-sweep-1">
   </head>
   <body>
     <div class="app-shell" id="appShell">
       <header class="topbar">
         <button class="brand" data-nav="map" aria-label="Go to map">
-          <span class="brand-mark" aria-hidden="true"><span>ϟ</span></span>
+          <span class="brand-mark" id="demoResetTrigger" aria-hidden="true"><span>ϟ</span></span>
           <span class="brand-copy"><strong>Jouling</strong><small>THE ART OF SAVING JOULES</small></span>
         </button>
         <div class="top-stats" aria-label="Player progress">
@@ -64,6 +64,7 @@
               <div class="map-legend">
                 <span><i class="legend-dot available"></i>Available</span>
                 <span><i class="legend-dot owned"></i>Team territory</span>
+                <span><i class="legend-dot sweep"></i>Team sweep</span>
                 <span><i class="legend-dot locked"></i>Unavailable</span>
               </div>
             </div>
@@ -219,6 +220,22 @@
       <button class="secondary-button" id="demoMissionButton">Demo: validate this QR</button>
     </aside>
 
+    <aside class="bottom-sheet zone-mission-sheet" id="zoneMissionSheet" aria-modal="true" role="dialog" aria-labelledby="zoneMissionTitle">
+      <button class="sheet-close" data-close-sheet aria-label="Close">×</button>
+      <div class="sheet-handle"></div>
+      <div class="zone-sheet-hero">
+        <div class="zone-sheet-icon" id="zoneMissionIcon">⚡</div>
+        <div><span>TEAM POWER SWEEP</span><h2 id="zoneMissionTitle">West Coast Power Sweep</h2><p id="zoneMissionLocation">West Coast Cluster</p></div>
+      </div>
+      <div class="zone-multiplier-card">
+        <div><span>LIVE TEAM BONUS</span><strong id="zoneMissionMultiplier">1.5× XP</strong></div>
+        <p>Every approved energy save inside this region earns bonus team XP.</p>
+      </div>
+      <p class="zone-description" id="zoneMissionDescription"></p>
+      <ol class="zone-instruction-list" id="zoneMissionInstructions"></ol>
+      <div class="zone-safety-card"><span>✓</span><div><strong>Approved switches only</strong><p id="zoneMissionSafety"></p></div></div>
+    </aside>
+
     <aside class="bottom-sheet proof-sheet" id="proofSheet" aria-modal="true" role="dialog" aria-labelledby="proofTitle">
       <button class="sheet-close" data-close-sheet aria-label="Close">×</button>
       <div class="sheet-handle"></div>
@@ -287,6 +304,6 @@
     </div>
 
     <div class="toast" id="toast" role="status" aria-live="polite"><span id="toastIcon">✓</span><p id="toastText">Updated</p></div>
-    <script type="module" src="/app.js?v=scanner-fallback-3"></script>
+    <script type="module" src="/app.js?v=team-sweep-1"></script>
   </body>
 </html>

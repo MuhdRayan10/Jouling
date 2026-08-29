@@ -239,6 +239,29 @@ export function createSeedState() {
         teamCompletions: {}
       }
     ],
+    zoneMissions: [
+      {
+        id: "zone-kent-ridge-west-sweep",
+        kind: "team-sweep",
+        title: "West Coast Power Sweep",
+        location: "West Coast Cluster",
+        icon: "⚡",
+        center: { longitude: 103.7555, latitude: 1.2989 },
+        radiusMeters: 240,
+        xpMultiplier: 1.5,
+        assignedTeamId: "team-green",
+        color: "#7B61FF",
+        darkColor: "#5139C5",
+        status: "LIVE",
+        description: "Your team has a temporary sweep zone. Check approved rooms inside it and stop unnecessary electricity use.",
+        instructions: [
+          "Check unoccupied rooms for approved lights left on.",
+          "Switch off labelled AC, projectors, or screens that are running unnecessarily.",
+          "Every verified action inside this circle earns 1.5× XP during the sweep."
+        ],
+        safety: "Use only controls carrying a Jouling label. Skip occupied rooms and never touch electrical panels."
+      }
+    ],
     territories: [
       {
         id: "territory-central",

@@ -24,6 +24,13 @@ export const apiContract = {
         responses: { "201": { description: "Bootstrap state for the new participant" } }
       }
     },
+    "/api/demo/reset": {
+      post: {
+        summary: "Restore the seeded in-memory demo state",
+        requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["confirmation"], properties: { confirmation: { type: "string", const: "RESET_JOULING_DEMO" } } } } } },
+        responses: { "200": { description: "Fresh bootstrap state for the demo participant" }, "403": { description: "Invalid reset confirmation" } }
+      }
+    },
     "/api/teams/join": {
       post: {
         summary: "Join an existing team by ID or invite code",

@@ -31,6 +31,7 @@ const DEMO_TOKENS = {
 let appState = null;
 let verifierMode = "demo";
 let selectedMission = null;
+let selectedZoneMission = null;
 let activeAttempt = null;
 let proofDataUrl = null;
 let scannerStream = null;
@@ -46,6 +47,9 @@ let mapMarkers = [];
 let userLocationMarker = null;
 let lastKnownLocation = null;
 let activeMapFilter = "all";
+let demoResetTapCount = 0;
+let demoResetTapTimer = null;
+let demoResetInProgress = false;
 
 const userId = () => localStorage.getItem("jouling.userId") || localStorage.getItem("ghostgrid.userId") || "u-demo";
 
@@ -206,7 +210,58 @@ function territoryGeoJson() {
   };
 }
 
+function zoneCircleCoordinates(zone, steps = 64) {
+  const latitude = Number(zone.center.latitude);
+  const longitude = Number(zone.center.longitude);
+  const latitudeRadius = Number(zone.radiusMeters) / 111_320;
+  const longitudeRadius = latitudeRadius / Math.cos(latitude * Math.PI / 180);
+  return Array.from({ length: steps + 1 }, (_, index) => {
+    const angle = (index / steps) * Math.PI * 2;
+    return [
+      longitude + Math.cos(angle) * longitudeRadius,
+      latitude + Math.sin(angle) * latitudeRadius
+    ];
+  });
+}
+
+function zoneMissionGeoJson() {
+  return {
+    type: "FeatureCollection",
+    features: (appState.zoneMissions || []).map((zone) => ({
+      type: "Feature",
+      id: zone.id,
+      properties: {
+        title: zone.title,
+        color: zone.color,
+        stroke: zone.darkColor,
+        multiplier: zone.xpMultiplier
+      },
+      geometry: { type: "Polygon", coordinates: [zoneCircleCoordinates(zone)] }
+    }))
+  };
+}
+
 function addTerritoryLayers() {
+  campusMap.addSource("zone-missions", { type: "geojson", data: zoneMissionGeoJson() });
+  campusMap.addLayer({
+    id: "zone-mission-fills",
+    type: "fill",
+    source: "zone-missions",
+    paint: {
+      "fill-color": ["get", "color"],
+      "fill-opacity": 0.2
+    }
+  });
+  campusMap.addLayer({
+    id: "zone-mission-outlines",
+    type: "line",
+    source: "zone-missions",
+    paint: {
+      "line-color": ["get", "stroke"],
+      "line-width": 3,
+      "line-dasharray": [1.2, 1.2]
+    }
+  });
   campusMap.addSource("territories", { type: "geojson", data: territoryGeoJson() });
   campusMap.addLayer({
     id: "territory-fills",
@@ -285,6 +340,7 @@ function renderMap(filter = "all") {
   if (!mapStyleReady) return;
 
   campusMap.getSource("territories")?.setData(territoryGeoJson());
+  campusMap.getSource("zone-missions")?.setData(zoneMissionGeoJson());
   clearMapMarkers();
 
   for (const territory of appState.territories) {
@@ -295,6 +351,19 @@ function renderMap(filter = "all") {
     label.textContent = owner.shortName.toUpperCase();
     mapMarkers.push(new Marker({ element: label, anchor: "center" })
       .setLngLat(territoryCentre(territory.polygon))
+      .addTo(campusMap));
+  }
+
+  for (const zone of appState.zoneMissions || []) {
+    const button = document.createElement("button");
+    button.className = "zone-mission-marker";
+    button.style.setProperty("--zone-color", zone.color);
+    button.style.setProperty("--zone-dark", zone.darkColor);
+    button.setAttribute("aria-label", `${zone.title}, team power sweep, ${zone.xpMultiplier} times XP`);
+    button.innerHTML = `<span>${escapeHtml(zone.icon)}</span><b>TEAM SWEEP</b><small>${formatNumber(zone.xpMultiplier, 1)}× XP ZONE</small>`;
+    button.addEventListener("click", () => openZoneMission(zone.id));
+    mapMarkers.push(new Marker({ element: button, anchor: "center" })
+      .setLngLat([zone.center.longitude, zone.center.latitude])
       .addTo(campusMap));
   }
 
@@ -400,6 +469,20 @@ function openMission(missionId) {
   else if (!mission.active) begin.textContent = mission.availableWindow;
   else begin.textContent = "Scan this mission";
   openSheet("#missionSheet");
+}
+
+function openZoneMission(zoneId) {
+  const zone = (appState.zoneMissions || []).find((item) => item.id === zoneId);
+  if (!zone) return showToast("Sweep zone not found", "!");
+  selectedZoneMission = zone;
+  $("#zoneMissionIcon").textContent = zone.icon;
+  $("#zoneMissionTitle").textContent = zone.title;
+  $("#zoneMissionLocation").textContent = zone.location;
+  $("#zoneMissionDescription").textContent = zone.description;
+  $("#zoneMissionMultiplier").textContent = `${formatNumber(zone.xpMultiplier, 1)}× XP`;
+  $("#zoneMissionInstructions").innerHTML = zone.instructions.map((instruction) => `<li>${escapeHtml(instruction)}</li>`).join("");
+  $("#zoneMissionSafety").textContent = zone.safety;
+  openSheet("#zoneMissionSheet");
 }
 
 function renderTeams() {
@@ -895,6 +978,55 @@ async function shareTeam() {
   }
 }
 
+async function resetDemoSession() {
+  if (demoResetInProgress) return;
+  demoResetInProgress = true;
+  showToast("Restoring the demo session…", "↻");
+  try {
+    const resetState = await api("/api/demo/reset", {
+      method: "POST",
+      body: JSON.stringify({ confirmation: "RESET_JOULING_DEMO" })
+    });
+    localStorage.setItem("jouling.userId", "u-demo");
+    localStorage.removeItem("ghostgrid.userId");
+    stopScanner();
+    closeSheets();
+    closeImpactDetail(false);
+    $("#verifyingOverlay").classList.remove("show");
+    $("#resultOverlay").classList.remove("show", "rejected");
+    selectedMission = null;
+    selectedZoneMission = null;
+    activeAttempt = null;
+    proofDataUrl = null;
+    resultRetryAllowed = false;
+    appState = resetState;
+    $$(".filter-pill").forEach((item) => item.classList.toggle("active", item.dataset.filter === "all"));
+    renderAll();
+    navigate("map");
+    campusMap?.jumpTo({ center: NUS_CAMPUS_CENTER, zoom: 14.25 });
+    showToast("Demo reset — all seeded tasks are ready again", "↻");
+  } catch (error) {
+    showToast(error.message || "Demo reset failed", "!");
+  } finally {
+    demoResetInProgress = false;
+  }
+}
+
+function handleDemoResetTap(event) {
+  event.stopPropagation();
+  if (demoResetInProgress) return;
+  clearTimeout(demoResetTapTimer);
+  demoResetTapCount += 1;
+  if (demoResetTapCount === 3) showToast("Demo reset armed — tap the bolt twice more", "•••");
+  if (demoResetTapCount === 4) showToast("One more bolt tap to reset", "•");
+  if (demoResetTapCount >= 5) {
+    demoResetTapCount = 0;
+    resetDemoSession();
+    return;
+  }
+  demoResetTapTimer = setTimeout(() => { demoResetTapCount = 0; }, 3500);
+}
+
 function bindEvents() {
   $$('[data-nav]').forEach((button) => button.addEventListener("click", () => navigate(button.dataset.nav)));
   $$('[data-close-sheet]').forEach((button) => button.addEventListener("click", closeSheets));
@@ -917,6 +1049,7 @@ function bindEvents() {
     fitMissionBounds(appState.missions);
     showToast(`${appState.missions.filter((item) => item.active).length} missions available now`, "⌖");
   });
+  $("#demoResetTrigger").addEventListener("click", handleDemoResetTap);
   $("#beginMissionButton").addEventListener("click", () => { closeSheets(); navigate("scan"); });
   $("#demoMissionButton").addEventListener("click", () => selectedMission && validateQr(selectedMission.id, DEMO_TOKENS[selectedMission.id]));
   $("#startScannerButton").addEventListener("click", startScanner);

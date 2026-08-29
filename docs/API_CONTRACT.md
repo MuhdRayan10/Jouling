@@ -27,6 +27,14 @@ Returns the complete client bootstrap payload: participant, active team, ranked 
 
 Creates a participant and joins the requested team, falling back to the default team when no code is supplied.
 
+### `POST /api/demo/reset`
+
+```json
+{ "confirmation": "RESET_JOULING_DEMO" }
+```
+
+Restores the complete in-memory seed and returns fresh bootstrap state for `u-demo`. The client exposes this only through the hidden five-tap Jouling-bolt gesture used during demonstrations.
+
 ## Teams
 
 ### `POST /api/teams/join`

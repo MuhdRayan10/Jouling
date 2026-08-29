@@ -68,6 +68,9 @@ When no key is present, `JOULING_DEMO_VERIFIER=true` accepts a valid image paylo
 3. Take the mandatory proof photo. The approved device and completed room state must be visible.
 4. Submit the image. The backend returns a structured verdict, awards 0.855 kWh, XP and credits, and captures Central Commons.
 5. Open Teams and Impact to see the updated leaderboard, reward wallet and Planet Relief metric.
+6. To replay the pitch, tap the green Jouling bolt in the top-left five times within 3.5 seconds. This restores the complete seeded demo state and returns the map to its original centre and 14.25 zoom.
+
+A purple **West Coast Power Sweep** is positioned beyond the initial map viewport. Pan west to discover it. The 240-metre team zone awards 1.5× XP for verified actions on approved lights, AC, projectors and screens, while the normal initial map centre and zoom remain unchanged.
 
 ## Generate physical QR labels
 
