@@ -1,0 +1,12 @@
+{
+  "name": "GhostGrid Energy League",
+  "short_name": "GhostGrid",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fffdf7",
+  "theme_color": "#58cc02",
+  "description": "Capture territory by completing verified energy-saving missions with your team.",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

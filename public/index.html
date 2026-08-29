@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#58cc02">
+    <meta name="description" content="Capture campus territory by completing verified energy-saving missions with your team.">
+    <title>GhostGrid</title>
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="icon" href="/icon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <div class="app-shell" id="appShell">
+      <header class="topbar">
+        <button class="brand" data-nav="map" aria-label="Go to map">
+          <span class="brand-mark" aria-hidden="true"><span>ϟ</span></span>
+          <span class="brand-copy"><strong>GhostGrid</strong><small>ENERGY LEAGUE</small></span>
+        </button>
+        <div class="top-stats" aria-label="Player progress">
+          <button class="stat-chip streak-chip" data-nav="impact" aria-label="Current streak">
+            <span aria-hidden="true">◆</span><b id="streakValue">4</b>
+          </button>
+          <button class="stat-chip xp-chip" data-nav="impact" aria-label="Experience points">
+            <span aria-hidden="true">ϟ</span><b id="xpValue">860</b>
+          </button>
+          <button class="avatar-button" data-nav="teams" aria-label="Open team view">
+            <span id="avatarValue">A</span>
+            <i class="online-dot"></i>
+          </button>
+        </div>
+      </header>
+
+      <main>
+        <section class="app-view active" id="view-map" data-view="map" aria-labelledby="mapHeading">
+          <div class="map-heading-row">
+            <div>
+              <p class="eyebrow">LIVE CAMPUS</p>
+              <h1 id="mapHeading">Claim your next zone</h1>
+            </div>
+            <button class="round-button locate-button" id="locateButton" aria-label="Centre on my location">◎</button>
+          </div>
+
+          <div class="league-card" id="leagueCard">
+            <div class="team-crest" id="teamCrest">ϟ</div>
+            <div class="league-copy">
+              <span id="leaguePosition">2nd in Campus League</span>
+              <strong id="teamName">Green Circuit</strong>
+              <div class="progress-track"><i id="leagueProgress" style="width: 72%"></i></div>
+            </div>
+            <div class="league-score"><b id="teamScore">2,840</b><span>XP</span></div>
+          </div>
+
+          <div class="map-card" id="mapCard">
+            <div class="map-toolbar">
+              <button class="filter-pill active" data-filter="all">All missions</button>
+              <button class="filter-pill" data-filter="nearby">Near me</button>
+              <button class="filter-pill" data-filter="high">High impact</button>
+            </div>
+            <div class="campus-map" id="campusMap" role="application" aria-label="Interactive campus mission map">
+              <svg class="map-art" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                <defs>
+                  <pattern id="smallGrid" width="10" height="10" patternUnits="userSpaceOnUse">
+                    <path d="M 10 0 L 0 0 0 10" fill="none" stroke="#dce9df" stroke-width="0.45"/>
+                  </pattern>
+                  <filter id="territoryShadow" x="-20%" y="-20%" width="140%" height="140%">
+                    <feDropShadow dx="0" dy="1" stdDeviation="1" flood-opacity="0.16"/>
+                  </filter>
+                </defs>
+                <rect width="100" height="100" fill="#f4f8f1"/>
+                <rect width="100" height="100" fill="url(#smallGrid)" opacity="0.65"/>
+                <path d="M-5,81 C18,69 28,73 46,61 C64,50 69,35 105,28" class="map-road major"/>
+                <path d="M10,-8 C14,21 18,35 33,47 C50,61 69,70 93,106" class="map-road"/>
+                <path d="M-4,28 C23,34 42,29 55,19 C67,10 79,8 105,13" class="map-road"/>
+                <path d="M61,-7 C58,17 60,34 76,48 C87,58 93,70 100,83" class="map-road minor"/>
+                <g class="water-feature">
+                  <path d="M0,90 C22,80 30,86 45,78 C61,70 72,69 100,60 L100,100 L0,100 Z"/>
+                </g>
+                <g class="building-shapes">
+                  <rect x="17" y="47" width="16" height="12" rx="2"/>
+                  <rect x="40" y="26" width="18" height="12" rx="2"/>
+                  <rect x="63" y="50" width="15" height="13" rx="2"/>
+                  <rect x="74" y="17" width="14" height="9" rx="2"/>
+                  <rect x="82" y="36" width="13" height="11" rx="2"/>
+                  <rect x="61" y="10" width="9" height="8" rx="2"/>
+                  <rect x="8" y="19" width="13" height="9" rx="2"/>
+                </g>
+                <g id="territoryLayer"></g>
+                <g class="map-labels">
+                  <text x="19" y="46">COM3</text>
+                  <text x="42" y="25">CENTRAL LIBRARY</text>
+                  <text x="75" y="16">UTOWN</text>
+                  <text x="82" y="35">INNOVATION 4.0</text>
+                </g>
+              </svg>
+              <div id="missionMarkers"></div>
+              <div class="map-legend">
+                <span><i class="legend-dot available"></i>Available</span>
+                <span><i class="legend-dot owned"></i>Your team</span>
+                <span><i class="legend-dot locked"></i>Unavailable</span>
+              </div>
+            </div>
+          </div>
+
+          <section class="section-block nearby-block">
+            <div class="section-heading">
+              <div><p class="eyebrow">QUICK WINS</p><h2>Nearby missions</h2></div>
+              <button class="text-button" id="viewAllMissions">View all</button>
+            </div>
+            <div class="mission-carousel" id="missionCarousel"></div>
+          </section>
+        </section>
+
+        <section class="app-view" id="view-scan" data-view="scan" aria-labelledby="scanHeading">
+          <div class="page-heading">
+            <p class="eyebrow">PHYSICAL CHECK-IN</p>
+            <h1 id="scanHeading">Scan a mission QR</h1>
+            <p>Find the approved GhostGrid label beside a switch or device.</p>
+          </div>
+          <div class="scanner-card">
+            <div class="scanner-window" id="scannerWindow">
+              <video id="scannerVideo" playsinline muted></video>
+              <div class="scanner-placeholder" id="scannerPlaceholder">
+                <div class="qr-glyph" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+                <strong>Ready when you are</strong>
+                <span>Camera access stays on this device.</span>
+              </div>
+              <div class="scan-frame" aria-hidden="true"><i></i><i></i><i></i><i></i><b></b></div>
+            </div>
+            <button class="primary-button" id="startScannerButton"><span aria-hidden="true">⌗</span> Start camera</button>
+            <button class="secondary-button" id="demoScanButton">Use featured demo QR</button>
+            <p class="privacy-note"><span aria-hidden="true">◆</span> QR camera frames are processed locally and never uploaded.</p>
+          </div>
+          <div class="scan-help-card">
+            <div class="coach-face" aria-hidden="true"><span>ϟ</span></div>
+            <div><strong>Look for approved labels</strong><p>A QR code means the institution has approved the exact action and active hours.</p></div>
+          </div>
+          <div class="manual-entry">
+            <label for="missionCodeInput">Can't scan?</label>
+            <div><input id="missionCodeInput" placeholder="Enter mission code, e.g. CLB-25C" autocomplete="off"><button id="manualCodeButton">Continue</button></div>
+          </div>
+        </section>
+
+        <section class="app-view" id="view-teams" data-view="teams" aria-labelledby="teamsHeading">
+          <div class="page-heading compact-heading">
+            <p class="eyebrow">CAMPUS LEAGUE</p>
+            <h1 id="teamsHeading">Teams</h1>
+            <p>Win territory together. Rewards follow verified impact.</p>
+          </div>
+          <div class="my-team-hero" id="myTeamHero">
+            <div class="team-hero-top">
+              <div class="large-crest" id="largeTeamCrest">ϟ</div>
+              <div><span>YOUR TEAM</span><h2 id="heroTeamName">Green Circuit</h2><p><b id="teamMemberCount">8</b> members • <b id="teamStreak">6</b> day team streak</p></div>
+            </div>
+            <div class="team-hero-stats">
+              <div><strong id="heroTeamKwh">18.6</strong><span>kWh saved</span></div>
+              <div><strong id="heroTeamTerritories">0</strong><span>territories</span></div>
+              <div><strong id="heroTeamCredits">$12.40</strong><span>reward pool</span></div>
+            </div>
+            <div class="team-actions">
+              <button class="light-button" id="shareTeamButton">Share code</button>
+              <button class="dark-button" id="openJoinTeamButton">Switch team</button>
+            </div>
+          </div>
+
+          <section class="section-block leaderboard-block">
+            <div class="section-heading"><div><p class="eyebrow">WEEKLY</p><h2>Campus leaderboard</h2></div><span class="season-pill">2d 14h left</span></div>
+            <div class="leaderboard" id="leaderboard"></div>
+          </section>
+
+          <section class="section-block activity-block">
+            <div class="section-heading"><div><p class="eyebrow">LIVE</p><h2>Team activity</h2></div></div>
+            <div class="activity-list" id="activityList"></div>
+          </section>
+        </section>
+
+        <section class="app-view" id="view-impact" data-view="impact" aria-labelledby="impactHeading">
+          <div class="page-heading compact-heading">
+            <p class="eyebrow">YOUR IMPACT</p>
+            <h1 id="impactHeading">Small actions. Big echo.</h1>
+            <p>Ground truth first, then a human-sized way to feel it.</p>
+          </div>
+          <div class="planet-card">
+            <div class="planet-orbit"><div class="planet" id="planetGraphic"><span>↯</span></div><i></i><b></b></div>
+            <div class="planet-copy"><span>PLANET RELIEF</span><strong id="planetReliefValue">0.19%</strong><p id="planetReliefText">If everyone matched your team's rate, this is the share of a global electricity day avoided.</p></div>
+          </div>
+          <div class="impact-grid">
+            <article><span class="impact-icon green">ϟ</span><strong id="impactKwh">18.6</strong><p>verified kWh saved</p></article>
+            <article><span class="impact-icon blue">◷</span><strong id="impactMinutes">1,140</strong><p>waste-minutes stopped</p></article>
+            <article><span class="impact-icon gold">$</span><strong id="impactCredits">12.40</strong><p>credits unlocked</p></article>
+            <article><span class="impact-icon purple">▲</span><strong id="impactBaseline">24%</strong><p>better than baseline</p></article>
+          </div>
+          <section class="reward-card">
+            <div class="reward-card-top"><div><p class="eyebrow">REAL-WORLD REWARD</p><h2>Team canteen wallet</h2></div><span class="wallet-icon">▰</span></div>
+            <div class="wallet-balance"><strong id="walletBalance">$12.40</strong><span>of $20 team unlock</span></div>
+            <div class="progress-track reward-progress"><i id="rewardProgress" style="width: 62%"></i></div>
+            <p>Verified institutional savings fund the wallet. No empty points.</p>
+          </section>
+          <details class="method-card">
+            <summary>How Planet Relief is calculated <span>＋</span></summary>
+            <p>We keep kWh as the audited metric. Planet Relief asks what would happen if everyone avoided electricity at the same per-person daily rate, compared with a transparent global daily electricity reference. It is a motivational equivalent—not a claim that literal planets were created or saved.</p>
+          </details>
+        </section>
+      </main>
+
+      <nav class="bottom-nav" aria-label="Primary navigation">
+        <button class="active" data-nav="map"><span aria-hidden="true">⌖</span><b>Map</b></button>
+        <button data-nav="scan"><span class="scan-nav-icon" aria-hidden="true">⌗</span><b>Scan</b></button>
+        <button data-nav="teams"><span aria-hidden="true">♟</span><b>Teams</b></button>
+        <button data-nav="impact"><span aria-hidden="true">◒</span><b>Impact</b></button>
+      </nav>
+    </div>
+
+    <div class="sheet-backdrop" id="sheetBackdrop"></div>
+    <aside class="bottom-sheet" id="missionSheet" aria-modal="true" role="dialog" aria-labelledby="missionSheetTitle">
+      <button class="sheet-close" data-close-sheet aria-label="Close">×</button>
+      <div class="sheet-handle"></div>
+      <div class="mission-sheet-hero" id="missionSheetHero">
+        <div class="mission-big-icon" id="missionBigIcon">❄</div>
+        <div><span id="missionDifficulty">TERRITORY CAPTURE</span><h2 id="missionSheetTitle">Close the cooling loop</h2><p id="missionLocation">Central Library</p></div>
+      </div>
+      <div class="territory-progress-card">
+        <div><strong id="territoryPrompt">One node to capture Central Commons</strong><span id="territoryNodeText">Your team controls 2 of 3 nodes</span></div>
+        <div class="node-dots" id="territoryDots"><i class="done"></i><i class="done"></i><i></i></div>
+      </div>
+      <div class="mission-instruction"><span>1</span><div><strong>Do this</strong><p id="missionInstruction"></p></div></div>
+      <div class="mission-instruction safety"><span>✓</span><div><strong>Approved and safe</strong><p id="missionSafety"></p></div></div>
+      <div class="mission-rewards">
+        <div><span>ϟ</span><strong id="missionXp">+120 XP</strong></div>
+        <div><span>◒</span><strong id="missionKwh">0.855 kWh</strong></div>
+        <div><span>$</span><strong id="missionCredit">$1.25</strong></div>
+      </div>
+      <button class="primary-button sheet-primary" id="beginMissionButton">Scan this mission</button>
+      <button class="secondary-button" id="demoMissionButton">Demo: validate this QR</button>
+    </aside>
+
+    <aside class="bottom-sheet proof-sheet" id="proofSheet" aria-modal="true" role="dialog" aria-labelledby="proofTitle">
+      <button class="sheet-close" data-close-sheet aria-label="Close">×</button>
+      <div class="sheet-handle"></div>
+      <div class="proof-heading"><div class="proof-step">2</div><div><span>PHOTO CHECK</span><h2 id="proofTitle">Show the finished task</h2><p id="proofExpected"></p></div></div>
+      <label class="photo-drop" id="photoDrop" for="proofPhotoInput">
+        <input type="file" id="proofPhotoInput" accept="image/jpeg,image/png,image/webp" capture="environment">
+        <img id="proofPreview" alt="Selected proof preview">
+        <div class="photo-placeholder" id="photoPlaceholder"><span>▣</span><strong>Take proof photo</strong><p>Keep the approved switch and room state visible.</p></div>
+      </label>
+      <div class="privacy-banner"><span>◆</span><p><strong>Privacy by design</strong>The MVP does not retain your photo after verification.</p></div>
+      <button class="primary-button" id="verifyPhotoButton" disabled>Verify with AI</button>
+      <button class="secondary-button" id="samplePhotoButton">Use sample proof for demo</button>
+    </aside>
+
+    <aside class="bottom-sheet team-sheet" id="teamSheet" aria-modal="true" role="dialog" aria-labelledby="teamSheetTitle">
+      <button class="sheet-close" data-close-sheet aria-label="Close">×</button>
+      <div class="sheet-handle"></div>
+      <div class="proof-heading"><div class="proof-step team-step">♟</div><div><span>TEAM UP</span><h2 id="teamSheetTitle">Join the competition</h2><p>Enter an invite code or create a new team.</p></div></div>
+      <form id="joinTeamForm" class="team-form">
+        <label for="teamCodeInput">Invite code</label>
+        <input id="teamCodeInput" name="teamCode" placeholder="GREEN7" maxlength="12" autocomplete="off">
+        <button class="primary-button" type="submit">Join team</button>
+      </form>
+      <div class="or-divider"><span>OR</span></div>
+      <form id="createTeamForm" class="team-form">
+        <label for="newTeamNameInput">Create your own</label>
+        <input id="newTeamNameInput" name="name" placeholder="The Negawatts" maxlength="36" autocomplete="off">
+        <button class="secondary-button" type="submit">Create team</button>
+      </form>
+    </aside>
+
+    <div class="verifying-overlay" id="verifyingOverlay" role="status" aria-live="polite">
+      <div class="verification-orb"><span>ϟ</span><i></i><b></b></div>
+      <h2>Checking your proof…</h2>
+      <p id="verificationStatus">Matching the device and completed state</p>
+      <div class="verification-steps"><i class="active"></i><i></i><i></i></div>
+    </div>
+
+    <div class="result-overlay" id="resultOverlay" role="dialog" aria-modal="true" aria-labelledby="resultTitle">
+      <div class="confetti" id="confetti" aria-hidden="true"></div>
+      <div class="result-card">
+        <div class="result-badge" id="resultBadge">✓</div>
+        <p class="eyebrow" id="resultEyebrow">MISSION VERIFIED</p>
+        <h2 id="resultTitle">Territory captured!</h2>
+        <p id="resultReason">Central Commons now belongs to Green Circuit.</p>
+        <div class="result-stats">
+          <div><span>ϟ</span><strong id="resultXp">+120</strong><small>XP</small></div>
+          <div><span>◒</span><strong id="resultKwh">0.855</strong><small>kWh</small></div>
+          <div><span>$</span><strong id="resultCredit">1.25</strong><small>credit</small></div>
+        </div>
+        <button class="primary-button" id="resultContinueButton">See the map</button>
+      </div>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"><span id="toastIcon">✓</span><p id="toastText">Updated</p></div>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
