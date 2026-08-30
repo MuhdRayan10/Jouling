@@ -1,109 +1,97 @@
-# Jouling MVP
+# Jouling
 
-Jouling is the art of saving joules: a mobile-first territory game for institution-approved electricity-saving missions. Teams find missions on a map, scan physical QR codes, submit mandatory proof photos, earn verified impact and capture triangular zones.
+**Live website: [jouling.vercel.app](https://jouling.vercel.app)**
 
-## Run it
+**Demo Video: [Video Link](https://youtu.be/tOAarREDPKA)**
 
-Use Node.js 20 or newer:
 
-```bash
-npm install
-npm start
-```
+Jouling is a mobile-first game that turns energy-saving actions into team missions. Players find approved tasks on a map, scan a physical QR label, submit a proof photo, earn XP and measurable impact, and compete for territory with their team.
 
-After pulling or merging a branch that changes `package.json`, run `npm install` again before `npm start`. If the machine's global npm cache has permission problems, use the project-local cache instead: `npm install --cache .npm-cache`.
+## Run locally
 
-Open [http://localhost:4173](http://localhost:4173). The default seeded participant is Ari on Green Circuit. The featured Central Library mission completes Green Circuit's third node and demonstrates a territory capture.
+Jouling requires **Node.js 20 or newer**.
 
-The campus view uses a locally served MapLibre GL JS client with OpenStreetMap tiles. Panning, zooming, mission filters and territory overlays work in the browser; loading the basemap requires an internet connection.
+1. Create a local environment file from the supplied example:
 
-To run the automated tests:
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Fill in `.env` using the same fields as `.env.example`:
+
+   ```text
+   PORT=4173
+   OPENAI_API_KEY=<your OpenAI API key>
+   OPENAI_VISION_MODEL=gpt-5.4-mini
+   JOULING_DEMO_VERIFIER=false
+   ```
+
+   Keep `.env` private and never commit API keys. To run without live AI verification, leave the key empty and set `JOULING_DEMO_VERIFIER=true`.
+
+3. Install dependencies and start the app:
+
+   ```bash
+   npm install
+   npm start
+   ```
+
+4. Open [http://localhost:4173](http://localhost:4173).
+
+Run the automated test suite with:
 
 ```bash
 npm test
 ```
 
-## Deploy to Vercel
+## Generate mission QR codes
 
-Import this repository in Vercel and use the **Other** framework preset. The
-`public/` directory is deployed as the static PWA, while `api/[...path].mjs`
-exposes the existing backend routes as a Vercel Function. No build command or
-output-directory override is required.
-
-Add these variables in **Project Settings → Environment Variables** for
-Production, Preview, and Development:
-
-```text
-OPENAI_API_KEY=<your rotated key>
-OPENAI_VISION_MODEL=gpt-5.4-mini
-JOULING_DEMO_VERIFIER=false
-```
-
-Do not add `PORT`: Vercel manages the function runtime. After redeploying, open
-`/api/health`; a working live-verification deployment reports `ok: true` and
-`verifierMode: "openai"`.
-
-The current store is intentionally in memory. It is suitable for a short demo,
-but Vercel can replace function instances at any time, so production game state
-requires a database.
-
-## Photo verification modes
-
-The complete OpenAI Responses API integration is implemented server-side. The server automatically loads a local `.env` file:
+The QR generator and in-app scanner use the same Jouling v1 payload schema.
 
 ```bash
-cp .env.example .env
-# Add OPENAI_API_KEY to .env and set JOULING_DEMO_VERIFIER=false
-npm start
-```
-
-Never expose `OPENAI_API_KEY` in browser code. When live verification is enabled, the demo-proof button is hidden and a fresh camera/upload photo is mandatory. The verifier returns a structured outcome for successful completion, an active room/device, an obstructed camera, an unclear image, the wrong location/device, a missing required state, or a safety issue. Non-safety failures can be retaken within the same ten-minute attempt.
-
-When no key is present, `JOULING_DEMO_VERIFIER=true` accepts a valid image payload and clearly labels its verdict as demo mode so the product loop can still run offline.
-
-## Demonstration flow
-
-1. Open the map and select **Close the cooling loop**.
-2. Choose **Demo: validate this QR** or open the Scan tab and use the featured demo QR action.
-3. Take the mandatory proof photo. The approved device and completed room state must be visible.
-4. Submit the image. The backend returns a structured verdict, awards 0.855 kWh, XP and credits, and captures Central Commons.
-5. Open Teams and Impact to see the updated leaderboard, reward wallet and Planet Relief metric.
-6. To replay the pitch, tap the green Jouling bolt in the top-left five times within 3.5 seconds. This restores the complete seeded demo state and returns the map to its original centre and 14.25 zoom.
-
-A purple **West Coast Power Sweep** is positioned beyond the initial map viewport. Pan west to discover it. The 240-metre team zone awards 1.5× XP for verified actions on approved lights, AC, projectors and screens, while the normal initial map centre and zoom remain unchanged.
-
-## Generate physical QR labels
-
-The standalone generator imports the same protocol module as the browser client, preventing the label format and scanner from drifting apart.
-
-```bash
+# List available missions
 npm run qr -- --list
+
+# Generate one mission label
 npm run qr -- --mission mission-library-ac
+
+# Generate labels for every mission
 npm run qr -- --all
 ```
 
-The default QR payload is domain-independent JSON carrying `protocol`, `v`, `mission`, and `token`. It is read by Jouling's in-app scanner and works unchanged on localhost, a Vercel preview, or the production deployment:
-
-```json
-{"protocol":"jouling.mission","v":1,"mission":"mission-library-ac","token":"qr_library_ac_2026"}
-```
-
-If a label must also open Jouling from the phone's native camera, generate an explicit web-link payload using the final Vercel production domain:
+The default output is domain-independent and can be scanned inside Jouling. To generate QR codes that open the deployed website from a phone's native camera, use:
 
 ```bash
-npm run qr -- --all --payload link --origin https://your-project.vercel.app
+npm run qr -- --all --payload link --origin https://jouling.vercel.app
 ```
 
-`--origin` can also come from `JOULING_APP_ORIGIN`. Link mode intentionally has no localhost default, preventing deployment-only failures. A link QR is tied to that domain; the default JSON QR is portable but must be scanned inside Jouling.
+Generated files are written to `generated-qr/`.
 
-Generated SVG or PNG files are written to `generated-qr/` by default. Camera QR detection uses the browser's `BarcodeDetector` API where available. Camera access requires HTTPS or localhost. Manual mission-code entry is intentionally unavailable. The scanner continues to accept deployed web links, `jouling://mission/...`, and legacy GhostGrid payloads, so previously printed non-local codes remain compatible. Regenerate any labels that contain `localhost`.
+## Technical overview
 
-## Architecture
+- A responsive, mobile-first web interface provides the map, scanner, proof-photo flow, teams, rewards and impact views.
+- MapLibre GL JS and OpenStreetMap provide the navigable campus map, mission markers, territories and team sweep zones.
+- Browser `BarcodeDetector` is used when available, with `jsQR` as the fallback QR decoder.
+- A Node.js HTTP API manages missions, teams, cooldowns, territory capture and the in-memory demo state.
+- OpenAI's Responses API performs structured server-side photo verification. The API key is never exposed to the browser.
+- Vercel hosts the static app and serverless API routes.
+- The MVP stores state in memory, so restarting the backend restores the seeded demo. A production release would replace this with persistent storage and institution-provided energy data.
 
-- `public/`: responsive web UI, navigable MapLibre campus map, QR scanner, camera proof flow, shared QR protocol, team league and impact screens.
-- `server/`: dependency-free Node HTTP server, in-memory session state, game rules and OpenAI photo verifier.
-- `scripts/generate-qr.mjs`: standalone SVG/PNG label generator using the shared Jouling QR v1 schema.
-- `docs/API_CONTRACT.md`: frontend/backend contract and competition semantics.
-- `tests/`: end-to-end API, QR, verification, cooldown, territory and OpenAI request-contract tests.
+## Project structure
 
-The MVP intentionally keeps state only for the lifetime of the Node process. Every verified task immediately updates the participant, team, impact, territory, reward, leaderboard, daily-match and activity views; restarting the server resets the demo. Production upgrades would add real authentication, persistent storage, signed/rotating QR tokens, EcoVolt telemetry ingestion, anomaly IDs, object-storage retention policies, admin RBAC and institution-specific schedules.
+```text
+public/                 Web interface, MapLibre map and QR scanner
+server/                 API, mission logic, state and photo verification
+api/                    Vercel serverless entry point
+scripts/generate-qr.mjs QR label generation CLI
+tests/                  API, QR, verification and game-logic tests
+docs/                   API and protocol documentation
+```
+
+### Main tools
+
+- JavaScript and Node.js 20+
+- MapLibre GL JS and OpenStreetMap
+- OpenAI Responses API
+- `BarcodeDetector` and `jsQR`
+- `qrcode` CLI generation
+- Vercel
